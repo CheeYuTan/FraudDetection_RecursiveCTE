@@ -41,7 +41,7 @@ try:
         major, minor = int(version_match.group(1)), int(version_match.group(2))
         if major < 17 or (major == 17 and minor < 0):
             print("⚠️  WARNING: This project requires Databricks Runtime 17.0 or later.")
-            print("   Recursive CTEs may not work correctly with older versions.")
+            print("   Recursive CTEs are only available in Runtime 17.0+ and will not work in older versions.")
     else:
         print("⚠️  Unable to determine runtime version. Please ensure you're using Runtime 17.0+")
 except Exception as e:
