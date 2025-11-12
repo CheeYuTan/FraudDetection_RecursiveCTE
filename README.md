@@ -112,10 +112,11 @@ Maximum score: 100 points
 
 ## Dataset Details
 
+**Note:** This demo uses synthetic data with pre-labeled fraud rings and relationships for demonstration purposes. In a production system, these would be discovered from raw claim data.
+
 ### Policyholders
 - Unique policyholders with realistic demographic data
 - Geographic distribution across multiple states
-- Fraud ring membership indicators
 - Policy start dates and contact information
 
 ### Claims
@@ -125,17 +126,40 @@ Maximum score: 100 points
 - Claim statuses: Pending, Approved, Denied, Under Review
 - Incident dates and processing timelines
 
-### Relationships
-- Connections between related claims
-- Fraud ring connections (strong relationships with high strength scores)
-- Similar pattern connections (weaker relationships based on shared attributes)
-- Relationship strength indicators for network analysis
+### Relationships (Production Approach)
 
-### Fraud Rings
-- Multiple fraud rings with varying member sizes
-- Connected through claim relationships
-- Higher fraud rates within rings compared to general population
-- Ring members show coordinated fraud patterns
+In a real insurance system, relationships would be **derived from actual data patterns**, not pre-labeled. Common relationship sources include:
+
+- **Shared attributes**: Same address, phone number, email, or adjuster
+- **Similar patterns**: Same claim type, similar dates, similar amounts
+- **Policyholder connections**: Claims from related policyholders (family members, business associates)
+- **Geographic proximity**: Claims from same location or nearby areas
+- **Temporal patterns**: Claims filed within short time windows
+- **Service provider connections**: Same repair shop, medical provider, or attorney
+
+The recursive queries then use these relationships to discover fraud networks.
+
+### Fraud Rings (Production Approach)
+
+In production, fraud rings are **discovered through recursive analysis**, not pre-labeled. The process:
+
+1. Start with known fraudulent claims (from investigations, ML models, or manual review)
+2. Use recursive CTEs to find all claims connected through relationships
+3. Identify clusters/networks of connected claims
+4. Analyze network characteristics to identify coordinated fraud patterns
+5. Flag high-risk networks as potential fraud rings
+
+The `fraud_ring_id` in this demo is synthetic for demonstration - in production, rings would be discovered and assigned through the recursive analysis process.
+
+## Production Use: Adapting to Real Data
+
+**Important:** This demo uses synthetic data with pre-labeled fraud rings and relationships. In production:
+
+- **Relationships** must be derived from actual data patterns (shared addresses, phone numbers, adjusters, similar patterns, etc.)
+- **Fraud rings** are discovered through recursive analysis, not pre-labeled
+- Start with known fraud cases and use recursive CTEs to find connected claims
+
+See [PRODUCTION_APPROACH.md](PRODUCTION_APPROACH.md) for detailed guidance on adapting this to real insurance claim data.
 
 ## Analysis Capabilities
 
