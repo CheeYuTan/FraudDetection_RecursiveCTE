@@ -99,11 +99,11 @@ spark.sql(f"USE SCHEMA {schema}")
 spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network(
   start_claim_id STRING,
-  max_depth INT DEFAULT 4
+  max_depth INT DEFAULT 3
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
-COMMENT 'Discovers fraud network using recursive CTEs - starting from a specific claim, finds all connected claims through shared policyholders, adjusters, and temporal patterns'
+COMMENT 'Discovers fraud network using recursive CTEs - optimized for large datasets (10M+ claims)'
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
@@ -143,7 +143,7 @@ BEGIN
     WHERE fn.depth < max_depth
       AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')  -- Prevent cycles
       AND (
-        -- Connection logic: multiple relationship types to find deeper networks
+        -- Connection logic: multiple relationship types to find broader networks
         -- 1. Policyholder connections (same address or phone)
         (p1.address = p2.address AND p1.address IS NOT NULL) OR
         (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
@@ -166,7 +166,7 @@ BEGIN
     path
   FROM fraud_network
   ORDER BY depth, claim_id
-  LIMIT 2000;
+  LIMIT 3000;
 END
 """)
 
@@ -326,12 +326,12 @@ else:
 
 # Discover the full fraud network using recursive CTEs
 print(f"🕸️  Discovering fraud network for claim {target_claim_id}...")
-print(f"   Using recursive CTEs with max_depth=4 (optimized for performance and visualization)\n")
+print(f"   Using recursive CTEs with max_depth=3 (optimized for 10M+ claims datasets)\n")
 
 network_df = spark.sql(f"""
 CALL {catalog}.{schema}.discover_fraud_network(
   start_claim_id => '{target_claim_id}',
-  max_depth => 4
+  max_depth => 3
 )
 """)
 
@@ -375,8 +375,8 @@ if network_count > 0:
     # Convert to pandas for easier manipulation
     network_pd = network_df.toPandas()
     
-    # Create PyVis network (undirected for cleaner visualization)
-    net = Network(height='800px', width='100%', bgcolor='#222222', font_color='white', directed=True)
+    # Create PyVis network with expanded view for larger networks
+    net = Network(height='1000px', width='100%', bgcolor='#222222', font_color='white', directed=True)
     
     # Configure physics for smooth animations
     net.set_options("""
@@ -516,8 +516,8 @@ if network_count > 0:
         WHERE c.claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
     """).toPandas()
     
-    # Create PyVis network
-    net_multi = Network(height='900px', width='100%', bgcolor='#1a1a1a', font_color='white')
+    # Create PyVis network with expanded view for larger networks
+    net_multi = Network(height='1100px', width='100%', bgcolor='#1a1a1a', font_color='white')
     
     # Configure physics for multi-entity graph
     net_multi.set_options("""
