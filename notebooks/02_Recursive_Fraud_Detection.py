@@ -16,8 +16,8 @@
 
 # COMMAND ----------
 
-# Install networkx for graph visualization
-%pip install networkx
+# Install required libraries for interactive graph visualization
+%pip install networkx pyvis
 
 # COMMAND ----------
 
@@ -26,8 +26,9 @@ from pyspark.sql.functions import col, count, sum, when, lit
 
 # Import visualization libraries
 import networkx as nx
-import matplotlib.pyplot as plt
 import pandas as pd
+from pyvis.network import Network
+import tempfile
 
 # COMMAND ----------
 
@@ -360,132 +361,121 @@ else:
 # COMMAND ----------
 
 if network_count > 0:
-    print("🎨 Creating network graph visualization...\n")
+    print("🎨 Creating interactive network graph visualization...\n")
     
     # Convert to pandas for easier manipulation
     network_pd = network_df.toPandas()
     
-    # Create a directed graph
-    G = nx.DiGraph()
+    # Create PyVis network (undirected for cleaner visualization)
+    net = Network(height='800px', width='100%', bgcolor='#222222', font_color='white', directed=True)
     
-    # Add nodes with attributes
+    # Configure physics for smooth animations
+    net.set_options("""
+    {
+      "physics": {
+        "forceAtlas2Based": {
+          "gravitationalConstant": -50,
+          "centralGravity": 0.01,
+          "springLength": 200,
+          "springConstant": 0.08
+        },
+        "maxVelocity": 50,
+        "solver": "forceAtlas2Based",
+        "timestep": 0.35,
+        "stabilization": {"iterations": 150}
+      },
+      "nodes": {
+        "font": {"size": 12, "color": "white"}
+      },
+      "edges": {
+        "color": {"inherit": true},
+        "smooth": {"type": "continuous"}
+      }
+    }
+    """)
+    
+    # Track nodes already added to avoid duplicates
+    nodes_added = set()
+    
+    # Add nodes with rich attributes
     for idx, row in network_pd.iterrows():
-        G.add_node(
-            row['claim_id'],
-            amount=row['claim_amount'],
-            is_fraud=row['is_fraud'],
-            depth=row['depth'],
-            claim_type=row['claim_type'],
-            policyholder=row['policyholder_id']
-        )
+        claim_id = row['claim_id']
+        is_fraud = row['is_fraud']
+        amount = row['claim_amount']
+        claim_type = row['claim_type']
+        depth = row['depth']
+        
+        if claim_id not in nodes_added:
+            # Color based on fraud status
+            color = '#ff4444' if is_fraud else '#4477ff'
+            
+            # Size based on claim amount
+            size = max(15, min(50, amount / 1000))
+            
+            # Create hover tooltip
+            title = f"""
+            <b>Claim ID:</b> {claim_id}<br>
+            <b>Type:</b> {claim_type}<br>
+            <b>Amount:</b> ${amount:,.2f}<br>
+            <b>Status:</b> {'🚨 FRAUD' if is_fraud else '✅ Legitimate'}<br>
+            <b>Depth:</b> {depth} (steps from origin)<br>
+            <b>Policyholder:</b> {row['policyholder_id']}
+            """
+            
+            net.add_node(
+                claim_id,
+                label=claim_id[:10],
+                color=color,
+                size=size,
+                title=title,
+                shape='dot',
+                borderWidth=2,
+                borderWidthSelected=4
+            )
+            nodes_added.add(claim_id)
     
     # Add edges by parsing the path
     for idx, row in network_pd.iterrows():
         path_parts = row['path'].split(' -> ')
         for i in range(len(path_parts) - 1):
-            G.add_edge(path_parts[i], path_parts[i + 1])
+            net.add_edge(
+                path_parts[i],
+                path_parts[i + 1],
+                color='#999999',
+                width=2,
+                arrows='to',
+                smooth={'type': 'continuous'}
+            )
     
-    # Create visualization
-    plt.figure(figsize=(16, 12))
+    # Generate and display the network
+    html_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w')
+    net.save_graph(html_file.name)
+    html_file.close()
     
-    # Use spring layout for better visualization
-    pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+    # Display in notebook
+    with open(html_file.name, 'r') as f:
+        html_content = f.read()
     
-    # Prepare node colors and sizes
-    node_colors = []
-    node_sizes = []
-    for node in G.nodes():
-        # Color: red for fraud, lightblue for legitimate
-        if G.nodes[node]['is_fraud']:
-            node_colors.append('#ff4444')  # Red for fraud
-        else:
-            node_colors.append('#4477ff')  # Blue for legitimate
-        
-        # Size based on claim amount (scaled)
-        amount = G.nodes[node]['amount']
-        node_sizes.append(max(300, min(3000, amount / 100)))  # Scale to reasonable size
+    displayHTML(html_content)
     
-    # Draw the network
-    nx.draw_networkx_nodes(
-        G, pos,
-        node_color=node_colors,
-        node_size=node_sizes,
-        alpha=0.8,
-        edgecolors='black',
-        linewidths=2
-    )
+    print("\n✨ Interactive Graph Features:")
+    print(f"  • 🖱️  Drag nodes to rearrange the network")
+    print(f"  • 🔍 Scroll to zoom in/out")
+    print(f"  • 👆 Hover over nodes to see claim details")
+    print(f"  • 🎯 Click and drag to pan around")
+    print(f"  • ⚡ Watch the physics simulation settle!")
     
-    nx.draw_networkx_edges(
-        G, pos,
-        edge_color='gray',
-        arrows=True,
-        arrowsize=15,
-        arrowstyle='->',
-        width=1.5,
-        alpha=0.5,
-        connectionstyle='arc3,rad=0.1'
-    )
-    
-    nx.draw_networkx_labels(
-        G, pos,
-        font_size=8,
-        font_weight='bold',
-        font_color='white'
-    )
-    
-    # Add legend
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor='#ff4444', edgecolor='black', label='Fraudulent Claim'),
-        Patch(facecolor='#4477ff', edgecolor='black', label='Legitimate Claim')
-    ]
-    plt.legend(handles=legend_elements, loc='upper right', fontsize=12)
-    
-    plt.title(f"Fraud Network Graph - Starting from Claim {target_claim_id}\n"
-              f"Total Claims: {network_count} | Fraudulent: {total_fraud} ({total_fraud/network_count*100:.1f}%)",
-              fontsize=16, fontweight='bold', pad=20)
-    plt.axis('off')
-    plt.tight_layout()
-    
-    # Display the graph
-    display(plt.show())
-    
-    print("\n📊 Graph Interpretation:")
-    print(f"  • Red nodes = Fraudulent claims")
-    print(f"  • Blue nodes = Legitimate claims")
+    print(f"\n📊 Color Legend:")
+    print(f"  • 🔴 Red nodes = Fraudulent claims")
+    print(f"  • 🔵 Blue nodes = Legitimate claims")
     print(f"  • Node size = Claim amount (larger = higher value)")
     print(f"  • Arrows = Connection discovered through recursion")
-    print(f"  • Starting claim: {target_claim_id}")
     
-    # Print some interesting network metrics
+    # Network metrics
     print(f"\n🔍 Network Metrics:")
-    print(f"  • Total nodes (claims): {G.number_of_nodes()}")
-    print(f"  • Total edges (connections): {G.number_of_edges()}")
-    
-    # Calculate network diameter (only if connected)
-    if G.number_of_nodes() > 1:
-        try:
-            if nx.is_connected(G.to_undirected()):
-                diameter = nx.diameter(G.to_undirected())
-                print(f"  • Network diameter: {diameter}")
-            else:
-                print(f"  • Network diameter: N/A (disconnected components)")
-        except:
-            print(f"  • Network diameter: N/A (unable to calculate)")
-    else:
-        print(f"  • Network diameter: N/A (single node)")
-    
-    # Calculate average degree (only if nodes exist)
-    if G.number_of_nodes() > 0:
-        try:
-            # Calculate average degree - total degree sum divided by number of nodes
-            total_degree = sum(degree for node, degree in G.degree())
-            avg_degree = total_degree / G.number_of_nodes()
-            print(f"  • Average degree: {avg_degree:.2f}")
-        except Exception as e:
-            print(f"  • Average degree: N/A (unable to calculate)")
-    else:
-        print(f"  • Average degree: N/A (no nodes)")
+    print(f"  • Total claims in network: {network_count}")
+    print(f"  • Fraudulent claims: {total_fraud} ({total_fraud/network_count*100:.1f}%)")
+    print(f"  • Starting claim: {target_claim_id}")
     
 else:
     print("⚠️  No network to visualize - claim appears to be isolated")
