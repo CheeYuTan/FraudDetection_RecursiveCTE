@@ -105,15 +105,14 @@ SELECT * FROM fraud_network;
 The system calculates fraud risk scores based on:
 - Known fraud status (50 points)
 - Membership in fraud network (30 points)
-- High number of connections (20 points)
+- High number of connections (20 points for >5 connections, 25 points for >10 connections)
 - High claim amount (15 points)
-- Fraud ring membership (25 points)
 
 Maximum score: 100 points
 
 ## Dataset Details
 
-**Note:** This demo uses synthetic data with pre-labeled fraud rings and relationships for demonstration purposes. In a production system, these would be discovered from raw claim data.
+**Note:** This demo generates synthetic data with discoverable fraud patterns. Relationships are derived from shared attributes (addresses, phone numbers, adjusters, similar patterns), and fraud rings are discovered through recursive analysis, just like in production.
 
 ### Policyholders
 - Unique policyholders with realistic demographic data
@@ -140,24 +139,24 @@ In a real insurance system, relationships would be **derived from actual data pa
 
 The recursive queries then use these relationships to discover fraud networks.
 
-### Fraud Rings (Production Approach)
+### Fraud Rings (Discovery-Based)
 
-In production, fraud rings are **discovered through recursive analysis**, not pre-labeled. The process:
+Fraud rings are **discovered through recursive analysis** from the generated data:
 
-1. Start with known fraudulent claims (from investigations, ML models, or manual review)
+1. Start with known fraudulent claims (marked with `is_fraud = true`)
 2. Use recursive CTEs to find all claims connected through relationships
 3. Identify clusters/networks of connected claims
 4. Analyze network characteristics to identify coordinated fraud patterns
 5. Flag high-risk networks as potential fraud rings
 
-The `fraud_ring_id` in this demo is synthetic for demonstration - in production, rings would be discovered and assigned through the recursive analysis process.
+The recursive queries in `02_Recursive_Fraud_Detection.py` demonstrate this discovery process.
 
 ## Production Use: Adapting to Real Data
 
-**Important:** This demo uses synthetic data with pre-labeled fraud rings and relationships. In production:
+**Important:** This demo generates synthetic data with relationships derived from shared attributes, and fraud rings are discovered through recursive analysis - the same approach used in production:
 
-- **Relationships** must be derived from actual data patterns (shared addresses, phone numbers, adjusters, similar patterns, etc.)
-- **Fraud rings** are discovered through recursive analysis, not pre-labeled
+- **Relationships** are derived from data patterns (shared addresses, phone numbers, adjusters, similar patterns, etc.)
+- **Fraud rings** are discovered through recursive analysis from relationships
 - Start with known fraud cases and use recursive CTEs to find connected claims
 
 See [PRODUCTION_APPROACH.md](PRODUCTION_APPROACH.md) for detailed guidance on adapting this to real insurance claim data.

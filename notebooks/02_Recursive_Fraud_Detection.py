@@ -67,7 +67,6 @@ spark.sql(f"USE {catalog}.{schema}")
 # MAGIC     c.policyholder_id,
 # MAGIC     c.claim_amount,
 # MAGIC     c.is_fraud,
-# MAGIC     c.fraud_ring_id,
 # MAGIC     0 as depth,
 # MAGIC     CAST(c.claim_id AS STRING) as path,
 # MAGIC     c.claim_id as root_claim_id
@@ -82,7 +81,6 @@ spark.sql(f"USE {catalog}.{schema}")
 # MAGIC     c.policyholder_id,
 # MAGIC     c.claim_amount,
 # MAGIC     c.is_fraud,
-# MAGIC     c.fraud_ring_id,
 # MAGIC     fn.depth + 1,
 # MAGIC     CONCAT(fn.path, ' -> ', c.claim_id) as path,
 # MAGIC     fn.root_claim_id
@@ -151,14 +149,14 @@ spark.sql(f"USE {catalog}.{schema}")
 # MAGIC ),
 # MAGIC 
 # MAGIC RECURSIVE policyholder_network AS (
-# MAGIC   -- Base case: Start with known fraud ring members
-# MAGIC   SELECT 
-# MAGIC     ph.policyholder_id,
-# MAGIC     ph.policyholder_id as root_policyholder,
+# MAGIC   -- Base case: Start with policyholders who have fraudulent claims
+# MAGIC   SELECT DISTINCT
+# MAGIC     c.policyholder_id,
+# MAGIC     c.policyholder_id as root_policyholder,
 # MAGIC     0 as depth,
-# MAGIC     CAST(ph.policyholder_id AS STRING) as path
-# MAGIC   FROM ${catalog}.${schema}.policyholders ph
-# MAGIC   WHERE ph.is_fraud_ring_member = true
+# MAGIC     CAST(c.policyholder_id AS STRING) as path
+# MAGIC   FROM ${catalog}.${schema}.claims c
+# MAGIC   WHERE c.is_fraud = true
 # MAGIC   
 # MAGIC   UNION ALL
 # MAGIC   
@@ -318,7 +316,7 @@ spark.sql(f"USE {catalog}.{schema}")
 # MAGIC     (CASE WHEN fnm.claim_id IS NOT NULL THEN 30 ELSE 0 END) +
 # MAGIC     (CASE WHEN COALESCE(cc.connection_count, 0) > 5 THEN 20 ELSE 0 END) +
 # MAGIC     (CASE WHEN c.claim_amount > 50000 THEN 15 ELSE 0 END) +
-# MAGIC     (CASE WHEN c.fraud_ring_id IS NOT NULL THEN 25 ELSE 0 END)
+# MAGIC     (CASE WHEN COALESCE(cc.connection_count, 0) > 10 THEN 25 ELSE 0 END)
 # MAGIC   ) as fraud_risk_score
 # MAGIC FROM ${catalog}.${schema}.claims c
 # MAGIC LEFT JOIN claim_connections cc ON c.claim_id = cc.claim_id
