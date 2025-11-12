@@ -285,7 +285,7 @@ if use_batch_processing:
                lit(" incident")).alias("description"),
         (rand() < lit(fraud_rate)).alias("is_fraud"),
         format_string("ADJ%03d", (rand() * num_adjusters + 1).cast("int")).alias("adjuster_id"),
-        (rand() * 89 + 1).cast("int").alias("processing_days")
+        ((rand() * 89 + 1).cast("int")).alias("processing_days")
     )
     
     # Write first batch to create table
@@ -324,7 +324,7 @@ if use_batch_processing:
                    element_at(array([lit(ct) for ct in claim_types]), 
                              (rand() * len(claim_types) + 1).cast("int")), 
                    lit(" incident")).alias("description"),
-            (rand() < lit(fraud_rate)).alias("is_fraud"),
+            (rand() < lit(fraud_rate)).cast(BooleanType()).alias("is_fraud"),
             format_string("ADJ%03d", (rand() * num_adjusters + 1).cast("int")).alias("adjuster_id"),
             (rand() * 89 + 1).cast("int").alias("processing_days")
         )
