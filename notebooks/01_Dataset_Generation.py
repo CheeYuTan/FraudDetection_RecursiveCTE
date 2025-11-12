@@ -232,7 +232,7 @@ if use_batch_processing:
     from pyspark.sql.types import StringType, BooleanType, DoubleType
     
     # Get policyholder IDs and attributes for relationship generation
-    policyholder_ids_df = policyholders_df.select("policyholder_id", "address", "phone", "city", "state").cache()
+    policyholder_ids_df = policyholders_df.select("policyholder_id", "address", "phone", "city", "state")
     policyholder_ids_list = [row.policyholder_id for row in policyholder_ids_df.collect()]
     
     # Create some policyholders with shared attributes (to create discoverable clusters)
@@ -317,7 +317,6 @@ if use_batch_processing:
     for df in all_claims_dfs[1:]:
         claims_df = claims_df.union(df)
     
-    claims_df = claims_df.cache()
     claims_count = claims_df.count()
     fraud_count = claims_df.filter(col("is_fraud") == True).count()
     
@@ -481,7 +480,6 @@ if use_batch_processing:
         relationships_df = relationships_df.limit(max_relationships)
         print(f"  Limiting relationships to {max_relationships:,} for performance")
     
-    relationships_df = relationships_df.cache()
     relationships_count = relationships_df.count()
     print(f"✓ Generated {relationships_count:,} relationships")
     print(f"  Relationship types: policyholder_connection, temporal_pattern, service_provider_connection")
