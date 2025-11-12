@@ -67,15 +67,6 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.fraud_network_bfs(
   start_claim_id STRING,
   max_depth INT
 )
-RETURNS TABLE (
-  claim_id STRING,
-  policyholder_id STRING,
-  claim_amount DOUBLE,
-  is_fraud BOOLEAN,
-  depth INT,
-  path STRING,
-  root_claim_id STRING
-)
 LANGUAGE SQL
 AS
   WITH RECURSIVE fraud_network AS (
@@ -127,14 +118,6 @@ spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks(
   max_depth INT DEFAULT 5,
   min_network_size INT DEFAULT 2
-)
-RETURNS TABLE (
-  root_claim_id STRING,
-  network_size BIGINT,
-  total_network_amount DOUBLE,
-  fraud_count BIGINT,
-  max_depth INT,
-  network_claims ARRAY<STRING>
 )
 LANGUAGE SQL
 AS
@@ -197,11 +180,6 @@ AS
 spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.get_claim_relationships(
   target_claim_id STRING
-)
-RETURNS TABLE (
-  related_claim_id STRING,
-  relationship_type STRING,
-  strength DOUBLE
 )
 LANGUAGE SQL
 AS
@@ -272,13 +250,6 @@ spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks_ondemand(
   max_depth INT DEFAULT 5,
   min_network_size INT DEFAULT 2
-)
-RETURNS TABLE (
-  root_claim_id STRING,
-  network_size BIGINT,
-  total_network_amount DOUBLE,
-  fraud_count BIGINT,
-  max_depth INT
 )
 LANGUAGE SQL
 AS
