@@ -123,29 +123,34 @@ BEGIN
     UNION ALL
     
     -- Recursive case: Find connected claims through policyholder connections
-    -- This is where the recursion happens - we keep expanding the network
-    -- Optimized: Uses only direct policyholder connections for best performance
-    SELECT DISTINCT
-      c2.claim_id,
-      c2.policyholder_id,
-      c2.claim_amount,
-      c2.is_fraud,
-      c2.claim_type,
-      c2.claim_date,
-      fn.depth + 1,
-      CONCAT(fn.path, ' -> ', c2.claim_id) as path
-    FROM fraud_network fn
-    INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-    -- Optimized join: Only connect policyholders with same address or phone
-    INNER JOIN {catalog}.{schema}.policyholders p2 ON (
-      (p1.address = p2.address AND p1.address IS NOT NULL) OR
-      (p1.phone = p2.phone AND p1.phone IS NOT NULL)
-    ) AND p2.policyholder_id != p1.policyholder_id
-    INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
-    WHERE fn.depth < max_depth
-      AND c2.claim_id != c1.claim_id
-      AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')  -- Prevent cycles
+    -- Optimized with row limit to prevent explosion on large datasets
+    SELECT * FROM (
+      SELECT DISTINCT
+        c2.claim_id,
+        c2.policyholder_id,
+        c2.claim_amount,
+        c2.is_fraud,
+        c2.claim_type,
+        c2.claim_date,
+        fn.depth + 1 as depth,
+        CONCAT(fn.path, ' -> ', c2.claim_id) as path
+      FROM fraud_network fn
+      INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
+      INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
+      -- Optimized join: Only connect policyholders with same address or phone
+      INNER JOIN {catalog}.{schema}.policyholders p2 ON (
+        (p1.address = p2.address AND p1.address IS NOT NULL) OR
+        (p1.phone = p2.phone AND p1.phone IS NOT NULL)
+      ) AND p2.policyholder_id != p1.policyholder_id
+      INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
+      WHERE fn.depth < max_depth
+        AND c2.claim_id != c1.claim_id
+        AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')  -- Prevent cycles
+        -- Filter: Prioritize higher value and fraud claims
+        AND (c2.is_fraud = true OR c2.claim_amount > 10000)
+      ORDER BY c2.is_fraud DESC, c2.claim_amount DESC
+      LIMIT 500  -- Limit expansion at each depth level
+    )
   )
   SELECT 
     claim_id,
@@ -157,8 +162,8 @@ BEGIN
     depth,
     path
   FROM fraud_network
-  ORDER BY depth, claim_id
-  LIMIT 3000;
+  ORDER BY depth, is_fraud DESC, claim_amount DESC
+  LIMIT 1500;
 END
 """)
 
