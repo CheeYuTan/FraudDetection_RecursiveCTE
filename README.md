@@ -32,42 +32,36 @@ The demo includes:
 
 ## Setup Instructions
 
-### Option A: Generate Dataset in Databricks (Recommended) ⭐
-
-**This is the easiest approach - generates data directly in Delta tables!**
-
-**You only need:**
-- `01_Dataset_Generation.py` notebook
-- `02_Recursive_Fraud_Detection.py` notebook  
-- `03_Fraud_Analysis_Visualization.py` notebook
-
-**Steps:**
-1. Import the notebook `01_Dataset_Generation.py` into your Databricks workspace
-2. Configure the widgets at the top of the notebook:
-   - **Catalog**: Your catalog name (default: `main`)
-   - **Schema**: Your schema/database name (default: `fraud_detection_demo`)
-   - **Number of Policyholders**: Default 1000
-   - **Number of Claims**: Default 5000
-   - **Fraud Rate**: Default 0.15 (15%)
-   - **Number of Adjusters**: Default 50
-   - **Overwrite Mode**: true/false
-3. Run the notebook - it will generate the data and write directly to Delta tables
-4. Proceed to notebook `02_Recursive_Fraud_Detection.py` (skip notebook 01)
-
-### 2. Import Databricks Notebooks
+### Step 1: Import Databricks Notebooks
 
 1. In your Databricks workspace, go to **Workspace**
 2. Create a new folder (e.g., `Fraud_Detection_Demo`)
 3. Import all 3 notebooks from the `notebooks/` directory:
-   - `01_Dataset_Generation.py` ⭐
+   - `01_Dataset_Generation.py`
    - `02_Recursive_Fraud_Detection.py`
    - `03_Fraud_Analysis_Visualization.py`
 
-### 3. Run the Notebooks in Sequence
+### Step 2: Generate Dataset
 
-1. **01_Dataset_Generation.py**: Generates dataset and writes to Delta tables (configure widgets first!)
-2. **02_Recursive_Fraud_Detection.py**: Runs recursive queries to detect fraud networks (configure widgets!)
-3. **03_Fraud_Analysis_Visualization.py**: Provides analysis and visualizations (configure widgets!)
+1. Open the `01_Dataset_Generation.py` notebook
+2. Configure the widgets at the top of the notebook:
+   - **Catalog**: Your catalog name (default: `main`)
+   - **Schema**: Your schema/database name (default: `fraud_detection_demo`)
+   - **Volume Scale**: Choose from small, medium, large, xlarge, or custom
+   - **Number of Policyholders**: Used if custom scale (default: 1000)
+   - **Number of Claims**: Used if custom scale (default: 5000)
+   - **Fraud Rate**: Default 0.15 (15%)
+   - **Number of Adjusters**: Default 50
+   - **Batch Size**: For large datasets (default: 1,000,000)
+   - **Overwrite Mode**: true/false
+3. Run the notebook - it will generate the data and write directly to Delta tables
+
+### Step 3: Run Fraud Detection Analysis
+
+1. **02_Recursive_Fraud_Detection.py**: Runs recursive queries to detect fraud networks
+   - Configure widgets: Catalog and Schema (must match Step 2)
+2. **03_Fraud_Analysis_Visualization.py**: Provides analysis and visualizations
+   - Configure widgets: Catalog and Schema (must match Step 2)
 
 **Important:** All notebooks use widgets for catalog and schema configuration. Make sure to set the same catalog and schema values across all notebooks!
 
