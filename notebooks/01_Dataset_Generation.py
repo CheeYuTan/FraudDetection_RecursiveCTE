@@ -17,8 +17,8 @@
 # COMMAND ----------
 
 # Create widgets for user configuration
-dbutils.widgets.text("catalog", "main", "Catalog Name")
-dbutils.widgets.text("schema", "fraud_detection_demo", "Schema/Database Name")
+dbutils.widgets.text("catalog", "dbdemos_steventan", "Catalog Name")
+dbutils.widgets.text("schema", "frauddetection_recursivecte", "Schema/Database Name")
 dbutils.widgets.dropdown("volume_scale", "small", ["small", "medium", "large", "xlarge", "custom"], "Volume Scale")
 dbutils.widgets.text("num_policyholders", "1000", "Number of Policyholders (used if custom)")
 dbutils.widgets.text("num_claims", "5000", "Number of Claims (used if custom)")

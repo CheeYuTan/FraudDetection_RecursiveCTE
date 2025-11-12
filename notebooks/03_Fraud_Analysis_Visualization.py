@@ -15,8 +15,8 @@
 # COMMAND ----------
 
 # Create widgets for user configuration
-dbutils.widgets.text("catalog", "main", "Catalog Name")
-dbutils.widgets.text("schema", "${catalog}.${schema}", "Schema/Database Name")
+dbutils.widgets.text("catalog", "dbdemos_steventan", "Catalog Name")
+dbutils.widgets.text("schema", "frauddetection_recursivecte", "Schema/Database Name")
 
 # Get widget values
 catalog = dbutils.widgets.get("catalog")
