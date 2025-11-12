@@ -38,10 +38,11 @@ This demo project provides a complete solution for fraud detection using Databri
 - **Risk Scoring**: Automated fraud risk assessment
 
 ### 📊 Dataset Characteristics
-- **1,000 Policyholders**: Realistic demographic data
-- **5,000 Claims**: ~15% fraud rate (750 fraudulent claims)
-- **Multiple Fraud Rings**: Connected networks of fraudsters
-- **Rich Relationships**: Connections between related claims
+- **Policyholders**: Realistic demographic data with geographic distribution
+- **Claims**: Configurable volume with multiple claim types and fraud patterns
+- **Fraud Rings**: Connected networks of fraudsters with coordinated patterns
+- **Relationships**: Rich connections between claims with varying strength indicators
+- **Adjusters**: Insurance adjuster data with department assignments
 
 ### 🎯 Use Cases Demonstrated
 1. **Recursive CTEs**: Traverse claim relationship graphs

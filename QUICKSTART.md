@@ -35,10 +35,10 @@ Get up and running with the Fraud Detection Demo in 5 minutes!
 - Suspicious claim chains
 
 ### Key Metrics
-- Total claims: 5,000 (default)
-- Fraudulent claims: ~750 (15% default)
-- Fraud rings: Multiple networks
-- Total fraud amount: Significant portion of total
+- Configurable dataset volume (from small to 100M+ records)
+- Configurable fraud rate (default 15%)
+- Multiple fraud rings with coordinated patterns
+- Fraudulent claims typically have higher claim amounts
 
 ### Recursive Queries
 The demo showcases:

@@ -109,25 +109,29 @@ Maximum score: 100 points
 ## Dataset Details
 
 ### Policyholders
-- 1,000 unique policyholders
-- Geographic distribution across 6 states
+- Unique policyholders with realistic demographic data
+- Geographic distribution across multiple states
 - Fraud ring membership indicators
+- Policy start dates and contact information
 
 ### Claims
-- 5,000 insurance claims
-- ~15% fraud rate (750 fraudulent claims)
+- Insurance claims with configurable fraud rate
 - Multiple claim types: Auto, Home, Health, Property, Liability
-- Claim amounts ranging from $100 to $500,000
+- Claim amounts with realistic distributions (fraudulent claims tend to be higher value)
+- Claim statuses: Pending, Approved, Denied, Under Review
+- Incident dates and processing timelines
 
 ### Relationships
 - Connections between related claims
-- Fraud ring connections (strong relationships)
-- Similar pattern connections (weaker relationships)
+- Fraud ring connections (strong relationships with high strength scores)
+- Similar pattern connections (weaker relationships based on shared attributes)
+- Relationship strength indicators for network analysis
 
 ### Fraud Rings
-- Multiple fraud rings with 5-15 members each
+- Multiple fraud rings with varying member sizes
 - Connected through claim relationships
-- Higher fraud rates within rings
+- Higher fraud rates within rings compared to general population
+- Ring members show coordinated fraud patterns
 
 ## Analysis Capabilities
 
@@ -174,13 +178,6 @@ In the recursive queries, adjust the depth limit:
 WHERE fn.depth < 5  -- Change to desired depth
 ```
 
-### Adding More Data
-
-Increase the number of records:
-```python
-policyholders_df = generate_policyholders(n=5000)  # More policyholders
-claims_df, fraud_rings = generate_claims(policyholders_df, n_claims=20000)  # More claims
-```
 
 ## Troubleshooting
 
