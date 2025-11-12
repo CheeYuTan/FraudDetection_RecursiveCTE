@@ -421,13 +421,31 @@ else:
 
 # MAGIC %md
 # MAGIC ## Step 5: Generate Adjusters
+# MAGIC 
+# MAGIC **What are Adjusters?**
+# MAGIC 
+# MAGIC Insurance adjusters are professionals who investigate and process insurance claims. In fraud detection, they play a key role:
+# MAGIC 
+# MAGIC - **Service Provider Connections**: Claims handled by the same adjuster within a time window can indicate relationships (one of the three relationship types used in fraud detection)
+# MAGIC - **Pattern Detection**: If an adjuster handles multiple suspicious claims, this can indicate coordinated fraud or internal fraud
+# MAGIC - **Special Investigations Unit (SIU)**: Some adjusters are part of the SIU, which specifically investigates potential fraud cases
+# MAGIC 
+# MAGIC **Why This Matters for Fraud Detection:**
+# MAGIC 
+# MAGIC In production systems, service provider connections (including adjusters, repair shops, medical providers, attorneys) are a critical relationship type for discovering fraud networks. The recursive queries use these connections to find related claims and build fraud networks.
 
 # COMMAND ----------
 
 print("Generating adjusters...")
 
 def generate_adjusters(n=50):
-    """Generate insurance adjuster data"""
+    """Generate insurance adjuster data
+    
+    Adjusters are assigned to claims and can be used to detect fraud patterns:
+    - Claims handled by the same adjuster within a time window are related (service provider connection)
+    - SIU members are specialized fraud investigators
+    - Department indicates the type of claims they handle
+    """
     adjusters = []
     for i in range(n):
         adjusters.append({

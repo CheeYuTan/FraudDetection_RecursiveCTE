@@ -125,6 +125,14 @@ Maximum score: 100 points
 - Claim amounts with realistic distributions (fraudulent claims tend to be higher value)
 - Claim statuses: Pending, Approved, Denied, Under Review
 - Incident dates and processing timelines
+- Each claim is assigned to an adjuster (insurance professional who investigates the claim)
+
+### Adjusters
+- Insurance adjusters who investigate and process claims
+- Departments: Auto, Home, Health, Property, Special Investigations
+- Some adjusters are members of the Special Investigations Unit (SIU) - specialized fraud investigators
+- Used to detect service provider connections: claims handled by the same adjuster within a time window are related
+- Important for fraud detection: patterns of multiple suspicious claims handled by the same adjuster can indicate coordinated fraud
 
 ### Relationships
 
@@ -132,7 +140,7 @@ Relationships are derived from data patterns and fall into three categories:
 
 1. **Policyholder connections**: Claims from related policyholders (same address, phone number, etc.)
 2. **Temporal patterns**: Claims filed within short time windows (within 30 days) with similar characteristics
-3. **Service provider connections**: Claims handled by the same service provider (adjuster, repair shop, medical provider, attorney, etc.)
+3. **Service provider connections**: Claims handled by the same service provider (adjuster, repair shop, medical provider, attorney, etc.) within 90 days
 
 The recursive queries use these relationships to discover fraud networks.
 
