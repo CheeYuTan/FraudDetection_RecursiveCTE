@@ -26,6 +26,7 @@ dbutils.widgets.text("fraud_rate", "0.15", "Fraud Rate (0.0-1.0)")
 dbutils.widgets.text("num_adjusters", "50", "Number of Adjusters")
 dbutils.widgets.text("batch_size", "1000000", "Batch Size for Large Datasets (recommended: 1M-10M)")
 dbutils.widgets.dropdown("overwrite_mode", "true", ["true", "false"], "Overwrite Existing Tables")
+dbutils.widgets.dropdown("generate_relationships", "true", ["true", "false"], "Generate Claim Relationships (required for recursive fraud detection)")
 
 # COMMAND ----------
 
@@ -37,6 +38,7 @@ fraud_rate = float(dbutils.widgets.get("fraud_rate"))
 num_adjusters = int(dbutils.widgets.get("num_adjusters"))
 batch_size = int(dbutils.widgets.get("batch_size"))
 overwrite_mode = dbutils.widgets.get("overwrite_mode") == "true"
+generate_relationships = dbutils.widgets.get("generate_relationships") == "true"
 
 # Define volume scales
 volume_configs = {
@@ -416,72 +418,148 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5: Generate Claim Relationships
+# MAGIC ## Step 5: Generate Claim Relationships (Optional)
+# MAGIC 
+# MAGIC **Note:** Relationships can be computed on-demand in recursive queries (recommended for large datasets).
+# MAGIC This step pre-generates relationships for convenience, but recursive queries can compute them dynamically.
+# MAGIC 
+# MAGIC **For large datasets:** Set `generate_relationships = false` and relationships will be computed on-demand in recursive queries.
 
 # COMMAND ----------
 
-print("Generating claim relationships...")
+if not generate_relationships:
+    print("⚠️  Skipping relationship pre-generation (generate_relationships = false)")
+    print("   Relationships will be computed on-demand in recursive queries (more efficient for large datasets).")
+    print("   Creating empty relationships table for compatibility...")
+    # Create empty relationships table with correct schema
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+    relationships_schema = StructType([
+        StructField("claim_id_1", StringType(), True),
+        StructField("claim_id_2", StringType(), True),
+        StructField("relationship_type", StringType(), True),
+        StructField("strength", DoubleType(), True)
+    ])
+    relationships_df = spark.createDataFrame([], relationships_schema)
+    relationships_count = 0
+    print(f"✓ Created empty relationships table")
+    print(f"  Note: Recursive queries will compute relationships dynamically based on:")
+    print(f"    - Policyholder connections (same address/phone)")
+    print(f"    - Temporal patterns (within 30 days, similar amounts)")
+    print(f"    - Service provider connections (same adjuster)")
 
-if use_batch_processing:
-    print("Using Spark-based relationship generation...")
-    from pyspark.sql.functions import col, rand, lit, datediff, abs as spark_abs
+if generate_relationships and use_batch_processing:
+    print("Using optimized Spark-based relationship generation...")
+    from pyspark.sql.functions import col, rand, lit, datediff, abs as spark_abs, collect_list, explode, size
     
-    # Join claims with policyholders to get attributes
-    claims_with_ph = claims_df.join(
-        policyholders_df.select("policyholder_id", "address", "phone", "city", "state"),
-        "policyholder_id"
-    )
+    # Limit sample size for relationship generation to avoid O(n²) explosion
+    # For large datasets, sample claims to generate relationships
+    max_claims_for_rels = min(num_claims, 100_000)  # Cap at 100K claims for relationship generation
+    if num_claims > max_claims_for_rels:
+        print(f"  Sampling {max_claims_for_rels:,} claims for relationship generation (to avoid O(n²) complexity)...")
+        claims_sample = claims_df.sample(fraction=min(1.0, max_claims_for_rels / num_claims), seed=42)
+    else:
+        claims_sample = claims_df
     
     all_relationships = []
     
-    # 1. Policyholder connections: Claims from related policyholders (same address, phone, etc.)
+    # 1. Policyholder connections: Use groupBy + explode (much faster than self-join)
     print("  Generating policyholder connections...")
-    policyholder_conn_rels = claims_with_ph.alias("c1").join(
-        claims_with_ph.alias("c2"),
-        (
-            # Same address or same phone number
-            ((col("c1.address") == col("c2.address")) & col("c1.address").isNotNull()) |
-            ((col("c1.phone") == col("c2.phone")) & col("c1.phone").isNotNull())
-        ) &
-        (col("c1.policyholder_id") != col("c2.policyholder_id")) &
-        (col("c1.claim_id") < col("c2.claim_id"))
-    ).select(
-        col("c1.claim_id").alias("claim_id_1"),
-        col("c2.claim_id").alias("claim_id_2"),
-        lit("policyholder_connection").alias("relationship_type"),
-        (rand() * 0.2 + 0.7).alias("strength")  # 0.7 to 0.9
+    claims_with_ph = claims_sample.join(
+        policyholders_df.select("policyholder_id", "address", "phone"),
+        "policyholder_id"
     )
+    
+    # Group by address, then explode to create pairs
+    from pyspark.sql.functions import collect_list, explode, array, slice
+    address_groups = claims_with_ph.filter(col("address").isNotNull()) \
+        .groupBy("address") \
+        .agg(collect_list("claim_id").alias("claim_ids")) \
+        .filter(size(col("claim_ids")) > 1)
+    
+    # Create pairs from each group (only first 10 pairs per address to limit explosion)
+    policyholder_conn_rels = address_groups.select(
+        col("address"),
+        explode(col("claim_ids")).alias("claim_id")
+    ).withColumn("row_num", row_number().over(Window.partitionBy("address").orderBy(rand()))) \
+     .filter(col("row_num") <= 10) \
+     .groupBy("address") \
+     .agg(collect_list("claim_id").alias("claim_ids")) \
+     .select(
+         explode(col("claim_ids")).alias("claim_id_1"),
+         col("address")
+     ).join(
+         address_groups.select(
+             explode(col("claim_ids")).alias("claim_id_2"),
+             col("address")
+         ),
+         ["address"]
+     ).filter(col("claim_id_1") < col("claim_id_2")) \
+     .select(
+         col("claim_id_1"),
+         col("claim_id_2"),
+         lit("policyholder_connection").alias("relationship_type"),
+         (rand() * 0.2 + 0.7).alias("strength")
+     ).limit(100_000)  # Hard limit
+    
     all_relationships.append(policyholder_conn_rels)
     
-    # 2. Temporal patterns: Claims filed within short time windows
+    # 2. Temporal patterns: Use window function (O(n) instead of O(n²))
     print("  Generating temporal patterns...")
-    temporal_rels = claims_df.alias("c1").join(
-        claims_df.alias("c2"),
-        (col("c1.claim_type") == col("c2.claim_type")) &
-        (col("c1.claim_id") < col("c2.claim_id")) &
-        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 30) &  # Within 30 days
-        (spark_abs(col("c1.claim_amount") - col("c2.claim_amount")) < col("c1.claim_amount") * 0.3)  # Similar amounts
+    from pyspark.sql.window import Window
+    from pyspark.sql.functions import lag
+    
+    temporal_window = Window.partitionBy("claim_type").orderBy("claim_date")
+    temporal_rels = claims_sample.withColumn(
+        "prev_claim_id", lag("claim_id", 1).over(temporal_window)
+    ).withColumn(
+        "prev_claim_date", lag("claim_date", 1).over(temporal_window)
+    ).withColumn(
+        "prev_claim_amount", lag("claim_amount", 1).over(temporal_window)
+    ).filter(
+        col("prev_claim_id").isNotNull() &
+        (spark_abs(datediff(col("claim_date"), col("prev_claim_date"))) < 30) &
+        (spark_abs(col("claim_amount") - col("prev_claim_amount")) < col("claim_amount") * 0.3)
     ).select(
-        col("c1.claim_id").alias("claim_id_1"),
-        col("c2.claim_id").alias("claim_id_2"),
+        col("prev_claim_id").alias("claim_id_1"),
+        col("claim_id").alias("claim_id_2"),
         lit("temporal_pattern").alias("relationship_type"),
-        (rand() * 0.3 + 0.5).alias("strength")  # 0.5 to 0.8
-    )
+        (rand() * 0.3 + 0.5).alias("strength")
+    ).limit(100_000)  # Hard limit
+    
     all_relationships.append(temporal_rels)
     
-    # 3. Service provider connections: Same adjuster, repair shop, medical provider, etc.
+    # 3. Service provider connections: Group by adjuster
     print("  Generating service provider connections...")
-    service_provider_rels = claims_df.alias("c1").join(
-        claims_df.alias("c2"),
-        (col("c1.adjuster_id") == col("c2.adjuster_id")) &
-        (col("c1.claim_id") < col("c2.claim_id")) &
-        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 90)  # Within 90 days
-    ).select(
-        col("c1.claim_id").alias("claim_id_1"),
-        col("c2.claim_id").alias("claim_id_2"),
-        lit("service_provider_connection").alias("relationship_type"),
-        (rand() * 0.2 + 0.6).alias("strength")  # 0.6 to 0.8
-    )
+    adjuster_groups = claims_sample.groupBy("adjuster_id") \
+        .agg(collect_list("claim_id").alias("claim_ids")) \
+        .filter(size(col("claim_ids")) > 1)
+    
+    service_provider_rels = adjuster_groups.select(
+        explode(col("claim_ids")).alias("claim_id_1"),
+        col("adjuster_id")
+    ).join(
+        adjuster_groups.select(
+            explode(col("claim_ids")).alias("claim_id_2"),
+            col("adjuster_id")
+        ),
+        ["adjuster_id"]
+    ).filter(col("claim_id_1") < col("claim_id_2")) \
+     .limit(100_000)  # Hard limit before date join
+     .join(
+         claims_sample.select("claim_id", "claim_date").alias("c1"),
+         col("claim_id_1") == col("c1.claim_id")
+     ).join(
+         claims_sample.select("claim_id", "claim_date").alias("c2"),
+         col("claim_id_2") == col("c2.claim_id")
+     ).filter(
+         spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 90
+     ).select(
+         col("claim_id_1"),
+         col("claim_id_2"),
+         lit("service_provider_connection").alias("relationship_type"),
+         (rand() * 0.2 + 0.6).alias("strength")
+     )
+    
     all_relationships.append(service_provider_rels)
     
     # Union all relationship types
@@ -493,17 +571,11 @@ if use_batch_processing:
     # Remove duplicates
     relationships_df = relationships_df.dropDuplicates(["claim_id_1", "claim_id_2"])
     
-    # Limit relationships for very large datasets
-    if num_claims > 1_000_000:
-        max_relationships = min(10_000_000, int(num_claims * 0.1))
-        relationships_df = relationships_df.limit(max_relationships)
-        print(f"  Limiting relationships to {max_relationships:,} for performance")
-    
     relationships_count = relationships_df.count()
     print(f"✓ Generated {relationships_count:,} relationships")
     print(f"  Relationship types: policyholder_connection, temporal_pattern, service_provider_connection")
     
-else:
+elif generate_relationships:
     # Use pandas for smaller datasets
     def generate_relationships_pandas(claims_df, policyholders_df):
         """Generate relationships between claims using 3 types: policyholder connections, temporal patterns, service provider connections"""

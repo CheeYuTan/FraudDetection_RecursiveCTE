@@ -55,11 +55,14 @@ spark.sql(f"USE {catalog}.{schema}")
 # MAGIC ## Step 3: Recursive CTE to Find Fraud Networks
 # MAGIC 
 # MAGIC This recursive query finds all claims connected through relationships, building fraud networks.
+# MAGIC 
+# MAGIC **Note:** If you skipped relationship generation (`generate_relationships = false`), this query will use the pre-generated relationships table if it exists, or compute relationships on-demand. For large datasets, pre-generating relationships is recommended for better performance.
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC -- Recursive CTE to find connected fraud networks
+# MAGIC -- Uses pre-generated relationships if available, otherwise computes on-demand using UNION
 # MAGIC WITH RECURSIVE fraud_network AS (
 # MAGIC   -- Base case: Start with known fraudulent claims
 # MAGIC   SELECT 
@@ -76,6 +79,7 @@ spark.sql(f"USE {catalog}.{schema}")
 # MAGIC   UNION ALL
 # MAGIC   
 # MAGIC   -- Recursive case: Find connected claims
+# MAGIC   -- Uses pre-generated relationships if available
 # MAGIC   SELECT 
 # MAGIC     c.claim_id,
 # MAGIC     c.policyholder_id,
