@@ -228,94 +228,113 @@ print("Generating claims with fraud patterns...")
 if use_batch_processing:
     print(f"Using batch processing for {num_claims:,} claims (batch size: {batch_size:,})...")
     
-    from pyspark.sql.functions import udf, rand, lit, concat, format_string, when, expr, least, col
+    from pyspark.sql.functions import udf, rand, lit, concat, format_string, when, expr, least, col, array, element_at
     from pyspark.sql.types import StringType, BooleanType, DoubleType
     
-    # Get policyholder IDs and attributes for relationship generation
-    policyholder_ids_df = policyholders_df.select("policyholder_id", "address", "phone", "city", "state")
-    policyholder_ids_list = [row.policyholder_id for row in policyholder_ids_df.collect()]
+    # Get policyholder count for random selection (avoid collecting to Python list)
+    policyholder_count = policyholders_df.count()
     
-    # Create some policyholders with shared attributes (to create discoverable clusters)
-    # This simulates real-world scenarios where fraud rings share addresses/phones
-    policyholders_pdf = policyholders_df.toPandas()
-    n_shared_groups = max(1, min(100, int(num_policyholders * 0.1)))  # ~10% of policyholders in shared groups
+    # Add row number to policyholders for efficient random selection
+    from pyspark.sql.window import Window
+    from pyspark.sql.functions import row_number, monotonically_increasing_id
     
-    for group_id in range(n_shared_groups):
-        group_size = np.random.randint(3, 8)
-        group_members = random.sample(range(len(policyholders_pdf)), min(group_size, len(policyholders_pdf)))
-        # Assign shared address and phone to group members
-        shared_address = f'{np.random.randint(100, 9999)} Shared St'
-        shared_phone = f'{np.random.randint(100, 999)}-{np.random.randint(100, 999)}-{np.random.randint(1000, 9999)}'
-        for idx in group_members:
-            policyholders_pdf.iloc[idx, policyholders_pdf.columns.get_loc('address')] = shared_address
-            policyholders_pdf.iloc[idx, policyholders_pdf.columns.get_loc('phone')] = shared_phone
+    # Create indexed policyholders view for efficient random selection
+    policyholders_indexed = policyholders_df.select(
+        col("policyholder_id"),
+        (monotonically_increasing_id() % policyholder_count).alias("ph_index")
+    )
+    policyholders_indexed.createOrReplaceTempView("temp_policyholders_indexed")
     
-    # Update policyholders_df with shared attributes
-    policyholders_df = spark.createDataFrame(policyholders_pdf)
-    policyholders_df = policyholders_df.withColumn('policy_start_date', to_date(col('policy_start_date')))
-    
-    # Generate claims in batches
+    # Generate claims in batches and write incrementally to avoid memory issues
     claim_types = ['Auto', 'Home', 'Health', 'Property', 'Liability']
     claim_statuses = ['Pending', 'Approved', 'Denied', 'Under Review']
     
-    all_claims_dfs = []
     num_batches = (num_claims + batch_size - 1) // batch_size
     
-    for batch_num in range(num_batches):
+    # Write first batch to create the table
+    batch_start = 0
+    batch_end = min(batch_size, num_claims)
+    batch_size_actual = batch_end - batch_start
+    
+    print(f"  Processing batch 1/{num_batches} ({batch_size_actual:,} claims)...")
+    
+    # Generate claims using join with indexed policyholders (efficient random selection)
+    claims_batch_df = spark.range(batch_start, batch_end).select(
+        (col("id") + 1).alias("claim_num"),
+        (rand() * policyholder_count).cast("int").alias("ph_index")
+    ).join(
+        policyholders_indexed,
+        "ph_index",
+        "left"
+    ).select(
+        format_string("CLM%08d", col("claim_num")).alias("claim_id"),
+        col("policyholder_id"),
+        element_at(array([lit(ct) for ct in claim_types]), 
+                   (rand() * len(claim_types) + 1).cast("int")).alias("claim_type"),
+        expr(f"date_sub(current_date(), cast(rand() * 729 + 1 as int))").alias("claim_date"),
+        expr(f"date_sub(current_date(), cast(rand() * 60 + 1 as int))").alias("incident_date"),
+        when(expr("rand() < 0.5"), 
+             least(expr("exp(9 + rand() * 1.5)"), lit(500000)))
+        .otherwise(least(expr("exp(7 + rand() * 1.2)"), lit(100000)))
+        .cast("double").alias("claim_amount"),
+        element_at(array([lit(cs) for cs in claim_statuses]), 
+                   (rand() * len(claim_statuses) + 1).cast("int")).alias("claim_status"),
+        concat(lit("Claim description for "), 
+               element_at(array([lit(ct) for ct in claim_types]), 
+                         (rand() * len(claim_types) + 1).cast("int")), 
+               lit(" incident")).alias("description"),
+        (rand() < lit(fraud_rate)).alias("is_fraud"),
+        format_string("ADJ%03d", (rand() * num_adjusters + 1).cast("int")).alias("adjuster_id"),
+        (rand() * 89 + 1).cast("int").alias("processing_days")
+    )
+    
+    # Write first batch to create table
+    write_mode = "overwrite" if overwrite_mode else "errorifexists"
+    claims_batch_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.claims")
+    
+    # Process remaining batches and append
+    for batch_num in range(1, num_batches):
         batch_start = batch_num * batch_size
         batch_end = min((batch_num + 1) * batch_size, num_claims)
         batch_size_actual = batch_end - batch_start
         
         print(f"  Processing batch {batch_num + 1}/{num_batches} ({batch_size_actual:,} claims)...")
         
-        # Create base DataFrame
-        claims_batch = spark.range(batch_start, batch_end).select(
-            (col("id") + 1).alias("claim_num")
-        )
-        
-        # Generate claim data using Spark functions
-        @udf(returnType=StringType())
-        def get_policyholder_id(seed):
-            return random.choice(policyholder_ids_list)
-        
-        @udf(returnType=StringType())
-        def get_claim_type(seed):
-            return random.choice(claim_types)
-        
-        @udf(returnType=StringType())
-        def get_claim_status(seed):
-            return random.choice(claim_statuses)
-        
-        @udf(returnType=BooleanType())
-        def is_fraud_claim(ph_id):
-            # Fraud probability - some policyholders with shared attributes have higher fraud rates
-            # This creates discoverable fraud patterns
-            return random.random() < fraud_rate
-        
-        claims_batch_df = claims_batch.select(
+        claims_batch_df = spark.range(batch_start, batch_end).select(
+            (col("id") + 1).alias("claim_num"),
+            (rand() * policyholder_count).cast("int").alias("ph_index")
+        ).join(
+            policyholders_indexed,
+            "ph_index",
+            "left"
+        ).select(
             format_string("CLM%08d", col("claim_num")).alias("claim_id"),
-            get_policyholder_id(rand()).alias("policyholder_id"),
-            get_claim_type(rand()).alias("claim_type"),
+            col("policyholder_id"),
+            element_at(array([lit(ct) for ct in claim_types]), 
+                       (rand() * len(claim_types) + 1).cast("int")).alias("claim_type"),
             expr(f"date_sub(current_date(), cast(rand() * 729 + 1 as int))").alias("claim_date"),
             expr(f"date_sub(current_date(), cast(rand() * 60 + 1 as int))").alias("incident_date"),
             when(expr("rand() < 0.5"), 
                  least(expr("exp(9 + rand() * 1.5)"), lit(500000)))
             .otherwise(least(expr("exp(7 + rand() * 1.2)"), lit(100000)))
             .cast("double").alias("claim_amount"),
-            get_claim_status(rand()).alias("claim_status"),
-            concat(lit("Claim description for "), get_claim_type(rand()), lit(" incident")).alias("description"),
-            is_fraud_claim(get_policyholder_id(rand())).alias("is_fraud"),
+            element_at(array([lit(cs) for cs in claim_statuses]), 
+                       (rand() * len(claim_statuses) + 1).cast("int")).alias("claim_status"),
+            concat(lit("Claim description for "), 
+                   element_at(array([lit(ct) for ct in claim_types]), 
+                             (rand() * len(claim_types) + 1).cast("int")), 
+                   lit(" incident")).alias("description"),
+            (rand() < lit(fraud_rate)).alias("is_fraud"),
             format_string("ADJ%03d", (rand() * num_adjusters + 1).cast("int")).alias("adjuster_id"),
             (rand() * 89 + 1).cast("int").alias("processing_days")
         )
         
-        all_claims_dfs.append(claims_batch_df)
+        # Append to table
+        claims_batch_df.write.mode("append").saveAsTable(f"{catalog}.{schema}.claims")
     
-    # Union all batches
-    print("Combining batches...")
-    claims_df = all_claims_dfs[0]
-    for df in all_claims_dfs[1:]:
-        claims_df = claims_df.union(df)
+    # Read back the complete claims table
+    print("Reading generated claims...")
+    claims_df = spark.table(f"{catalog}.{schema}.claims")
     
     claims_count = claims_df.count()
     fraud_count = claims_df.filter(col("is_fraud") == True).count()
