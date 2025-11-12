@@ -99,7 +99,7 @@ spark.sql(f"USE SCHEMA {schema}")
 spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network(
   start_claim_id STRING,
-  max_depth INT DEFAULT 5
+  max_depth INT DEFAULT 4
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
@@ -326,12 +326,12 @@ else:
 
 # Discover the full fraud network using recursive CTEs
 print(f"🕸️  Discovering fraud network for claim {target_claim_id}...")
-print(f"   Using recursive CTEs with max_depth=5 (for impressive visualization)\n")
+print(f"   Using recursive CTEs with max_depth=4 (optimized for performance and visualization)\n")
 
 network_df = spark.sql(f"""
 CALL {catalog}.{schema}.discover_fraud_network(
   start_claim_id => '{target_claim_id}',
-  max_depth => 5
+  max_depth => 4
 )
 """)
 
