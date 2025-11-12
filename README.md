@@ -20,7 +20,8 @@ The demo includes:
 │   ├── 02_Recursive_Fraud_Detection.py  # Recursive fraud detection queries
 │   └── 03_Fraud_Analysis_Visualization.py  # Analysis and visualization
 └── sql_scripts/                       # Standalone SQL scripts
-    └── recursive_fraud_queries.sql    # Recursive SQL queries
+    ├── recursive_fraud_queries.sql    # Recursive SQL queries
+    └── fraud_detection_stored_procedures.sql  # Stored procedures for reusable fraud detection
 ```
 
 **Clean and minimal!** All data generation happens directly in Databricks - no CSV files or local scripts needed.
@@ -198,6 +199,28 @@ Use the widgets in `01_Dataset_Generation.py` to adjust:
 
 Simply change the widget values and re-run the notebook!
 
+### Using Stored Procedures (Recommended)
+
+For better reusability and performance, you can create stored procedures from the SQL scripts:
+
+1. Run `sql_scripts/fraud_detection_stored_procedures.sql` in Databricks SQL
+2. Use stored procedures instead of inline queries:
+   ```sql
+   -- Find fraud networks
+   CALL discover_fraud_networks(max_depth => 5, min_network_size => 2);
+   
+   -- BFS from a specific claim
+   CALL fraud_network_bfs(start_claim_id => 'CLM00000001', max_depth => 3);
+   
+   -- Get relationships for a claim (on-demand, no pre-generation needed)
+   CALL get_claim_relationships(target_claim_id => 'CLM00000001');
+   
+   -- Discover networks with on-demand relationship computation
+   CALL discover_fraud_networks_ondemand(max_depth => 5);
+   ```
+
+Stored procedures can also be used as tools in agentic systems (see [this article](https://medium.com/dbsql-sme-engineering/graph-analytics-with-dbsql-stored-procedures-and-agents-5e53bad68032) for examples).
+
 ### Modifying Recursion Depth
 
 In the recursive queries, adjust the depth limit:
@@ -205,6 +228,10 @@ In the recursive queries, adjust the depth limit:
 WHERE fn.depth < 5  -- Change to desired depth
 ```
 
+Or use stored procedures with parameters:
+```sql
+CALL discover_fraud_networks(max_depth => 10, min_network_size => 3);
+```
 
 ## Troubleshooting
 
