@@ -339,13 +339,11 @@ print("\nYou can now use these stored procedures as reusable tools!")
 # MAGIC %md
 # MAGIC ## Step 4: Recursive CTE to Find Fraud Networks
 # MAGIC 
+# MAGIC This recursive query finds all claims connected through relationships, building fraud networks.
+# MAGIC 
 # MAGIC **Option A: Using Stored Procedure (Recommended)**
 # MAGIC 
 # MAGIC Use the stored procedure for cleaner, reusable code:
-# MAGIC 
-# MAGIC This recursive query finds all claims connected through relationships, building fraud networks.
-# MAGIC 
-# MAGIC **Note:** If you skipped relationship generation (`generate_relationships = false`), this query will use the pre-generated relationships table if it exists, or compute relationships on-demand. For large datasets, pre-generating relationships is recommended for better performance.
 
 # COMMAND ----------
 
