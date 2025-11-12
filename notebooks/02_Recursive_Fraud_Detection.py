@@ -9,6 +9,18 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Install Required Libraries
+# MAGIC 
+# MAGIC We need NetworkX for graph visualization. This only needs to be run once per cluster.
+
+# COMMAND ----------
+
+# Install networkx for graph visualization
+%pip install networkx
+
+# COMMAND ----------
+
 # Import required PySpark functions
 from pyspark.sql.functions import col, count, sum, when, lit
 
