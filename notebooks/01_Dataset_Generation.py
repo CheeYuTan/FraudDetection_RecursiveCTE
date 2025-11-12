@@ -116,7 +116,9 @@ except Exception as e:
 
 # Create database/schema if it doesn't exist
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
-spark.sql(f"USE {catalog}.{schema}")
+# Use catalog and schema separately
+spark.sql(f"USE CATALOG {catalog}")
+spark.sql(f"USE SCHEMA {schema}")
 
 print(f"Using catalog: {catalog}, schema: {schema}")
 

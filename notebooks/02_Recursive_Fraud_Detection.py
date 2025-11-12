@@ -16,7 +16,7 @@
 
 # Create widgets for user configuration
 dbutils.widgets.text("catalog", "main", "Catalog Name")
-dbutils.widgets.text("schema", "${catalog}.${schema}", "Schema/Database Name")
+dbutils.widgets.text("schema", "fraud_detection_demo", "Schema/Database Name")
 
 # Get widget values
 catalog = dbutils.widgets.get("catalog")
@@ -47,7 +47,9 @@ try:
 except Exception as e:
     print("⚠️  Could not check runtime version. Please ensure you're using Databricks Runtime 17.0+")
 
-spark.sql(f"USE {catalog}.{schema}")
+# Use catalog and schema separately
+spark.sql(f"USE CATALOG {catalog}")
+spark.sql(f"USE SCHEMA {schema}")
 
 # COMMAND ----------
 
