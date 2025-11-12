@@ -317,12 +317,12 @@ else:
 
 # Discover the full fraud network using recursive CTEs
 print(f"🕸️  Discovering fraud network for claim {target_claim_id}...")
-print(f"   Using recursive CTEs with max_depth=3\n")
+print(f"   Using recursive CTEs with max_depth=5 (for impressive visualization)\n")
 
 network_df = spark.sql(f"""
 CALL {catalog}.{schema}.discover_fraud_network(
   start_claim_id => '{target_claim_id}',
-  max_depth => 3
+  max_depth => 5
 )
 """)
 
@@ -412,15 +412,9 @@ if network_count > 0:
             # Size based on claim amount
             size = max(15, min(50, amount / 1000))
             
-            # Create hover tooltip
-            title = f"""
-            <b>Claim ID:</b> {claim_id}<br>
-            <b>Type:</b> {claim_type}<br>
-            <b>Amount:</b> ${amount:,.2f}<br>
-            <b>Status:</b> {'🚨 FRAUD' if is_fraud else '✅ Legitimate'}<br>
-            <b>Depth:</b> {depth} (steps from origin)<br>
-            <b>Policyholder:</b> {row['policyholder_id']}
-            """
+            # Create hover tooltip (clean format)
+            status_emoji = '🚨 FRAUD' if is_fraud else '✅ Legitimate'
+            title = f"Claim: {claim_id}\nType: {claim_type}\nAmount: ${amount:,.2f}\nStatus: {status_emoji}\nDepth: {depth}\nPolicyholder: {row['policyholder_id']}"
             
             net.add_node(
                 claim_id,
@@ -551,13 +545,8 @@ if network_count > 0:
         color = '#ff4444' if is_fraud else '#4477ff'
         size = max(20, min(60, amount / 800))
         
-        title = f"""
-        <b>🎫 CLAIM</b><br>
-        <b>ID:</b> {claim_id}<br>
-        <b>Type:</b> {claim_type}<br>
-        <b>Amount:</b> ${amount:,.2f}<br>
-        <b>Status:</b> {'🚨 FRAUD' if is_fraud else '✅ Legitimate'}
-        """
+        status_emoji = '🚨 FRAUD' if is_fraud else '✅ Legitimate'
+        title = f"🎫 CLAIM\n{claim_id}\n{claim_type}\n${amount:,.2f}\n{status_emoji}"
         
         net_multi.add_node(
             claim_id,
@@ -573,10 +562,7 @@ if network_count > 0:
         # Add policyholder node
         ph_id = row['policyholder_id']
         if ph_id not in policyholder_nodes:
-            ph_title = f"""
-            <b>👤 POLICYHOLDER</b><br>
-            <b>ID:</b> {ph_id}
-            """
+            ph_title = f"👤 POLICYHOLDER\n{ph_id}"
             net_multi.add_node(
                 ph_id,
                 label=f"PH-{ph_id[-4:]}",
@@ -597,12 +583,7 @@ if network_count > 0:
         claim_id = row['claim_id']
         
         if adj_id not in adjuster_nodes:
-            adj_title = f"""
-            <b>🏥 SERVICE PROVIDER</b><br>
-            <b>ID:</b> {adj_id}<br>
-            <b>Name:</b> {row['adjuster_name']}<br>
-            <b>Dept:</b> {row['department']}
-            """
+            adj_title = f"🏥 SERVICE PROVIDER\n{adj_id}\n{row['adjuster_name']}\n{row['department']}"
             net_multi.add_node(
                 adj_id,
                 label=f"ADJ-{adj_id[-3:]}",
