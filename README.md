@@ -7,24 +7,23 @@ This demo showcases how to use Databricks recursive SQL capabilities to detect i
 The demo includes:
 - **Synthetic Dataset**: Realistic insurance claim data with fraud patterns and networks
 - **Recursive SQL Queries**: Advanced queries to detect fraud rings and connected claims
+- **Network Graph Visualization**: Visual representation of fraud networks discovered through recursion
+- **Stored Procedures**: Reusable fraud detection tools for production and agentic systems
 - **Network Analysis**: Identify policyholder networks and suspicious claim chains
-- **Fraud Risk Scoring**: Calculate risk scores based on network connections
 
 ## Project Structure
 
 ```
 .
 ├── README.md                          # This file
-├── notebooks/                         # Databricks notebooks
-│   ├── 01_Dataset_Generation.py     # ⭐ Generate dataset directly in Databricks
-│   ├── 02_Recursive_Fraud_Detection.py  # Recursive fraud detection queries
-│   └── 03_Fraud_Analysis_Visualization.py  # Analysis and visualization
-└── sql_scripts/                       # Standalone SQL scripts
-    ├── recursive_fraud_queries.sql    # Recursive SQL queries
-    └── fraud_detection_stored_procedures.sql  # Stored procedures for reusable fraud detection
+└── notebooks/                         # Databricks notebooks
+    ├── 01_Dataset_Generation.py      # ⭐ Generate dataset directly in Databricks
+    └── 02_Recursive_Fraud_Detection.py  # Recursive fraud detection with network visualization
 ```
 
-**Clean and minimal!** All data generation happens directly in Databricks - no CSV files or local scripts needed.
+**Clean and minimal!** Just 2 notebooks with everything you need:
+1. Generate data
+2. Detect fraud networks with recursive CTEs and visualize them
 
 ## Prerequisites
 
@@ -41,17 +40,16 @@ The demo includes:
 4. Choose a destination folder (e.g., `Fraud_Detection_Demo`)
 5. Click **Clone**
 
-This will clone the entire repository into your workspace, including all 3 notebooks:
+This will clone the entire repository into your workspace, including both notebooks:
 - `notebooks/01_Dataset_Generation.py`
 - `notebooks/02_Recursive_Fraud_Detection.py`
-- `notebooks/03_Fraud_Analysis_Visualization.py`
 
 ### Step 2: Generate Dataset
 
 1. Open the `notebooks/01_Dataset_Generation.py` notebook from the cloned repository
 2. Configure the widgets at the top of the notebook:
-   - **Catalog**: Your catalog name (default: `main`)
-   - **Schema**: Your schema/database name (default: `fraud_detection_demo`)
+   - **Catalog**: Your catalog name (default: `dbdemos_steventan`)
+   - **Schema**: Your schema/database name (default: `frauddetection_recursivecte`)
    - **Volume Scale**: Choose from small, medium, large, xlarge, or custom
    - **Number of Policyholders**: Used if custom scale (default: 1000)
    - **Number of Claims**: Used if custom scale (default: 5000)
@@ -61,54 +59,61 @@ This will clone the entire repository into your workspace, including all 3 noteb
    - **Overwrite Mode**: true/false
 3. Run the notebook - it will generate the data and write directly to Delta tables
 
-### Step 3: Run Fraud Detection Analysis
+### Step 3: Run Fraud Detection & Visualization
 
-1. **notebooks/02_Recursive_Fraud_Detection.py**: Runs recursive queries to detect fraud networks
-   - Configure widgets: Catalog and Schema (must match Step 2)
-2. **notebooks/03_Fraud_Analysis_Visualization.py**: Provides analysis and visualizations
-   - Configure widgets: Catalog and Schema (must match Step 2)
+1. Open **notebooks/02_Recursive_Fraud_Detection.py**
+2. Configure widgets: Catalog and Schema (must match Step 2)
+3. Run the notebook to:
+   - Create reusable stored procedures for fraud detection
+   - Follow an interactive fraud investigation story
+   - Discover fraud networks using recursive CTEs
+   - **Visualize the fraud network as an interactive graph** showing:
+     - Red nodes = Fraudulent claims
+     - Blue nodes = Legitimate claims
+     - Node size = Claim amount
+     - Arrows = Connections discovered through recursion
+   - Analyze network statistics and patterns
 
-**Important:** All notebooks use widgets for catalog and schema configuration. Make sure to set the same catalog and schema values across all notebooks!
+**Important:** All notebooks use widgets for catalog and schema configuration. Make sure to set the same catalog and schema values across both notebooks!
 
 ## Key Features
 
-### Recursive Fraud Network Detection
+### 🎯 Interactive Fraud Investigation Story
+
+The demo walks you through a realistic fraud investigation workflow:
+1. **Identify** suspicious claims (high-value fraudulent claims)
+2. **Understand** direct relationships (why claims are connected)
+3. **Discover** the full fraud network using recursive CTEs
+4. **Visualize** the network as an interactive graph
+
+### 🕸️ Network Graph Visualization
+
+The demo includes a stunning network graph visualization that shows:
+- **Nodes**: Each claim in the fraud network
+  - Red = Fraudulent claims
+  - Blue = Legitimate claims
+  - Size = Claim amount (larger = higher value)
+- **Edges**: Connections discovered through recursive traversal
+- **Arrows**: Direction of network exploration
+- **Network metrics**: Diameter, average degree, total impact
+
+This makes the "recursion magic" visible and compelling!
+
+### 🔄 Recursive Fraud Network Detection
 
 The demo uses recursive Common Table Expressions (CTEs) to:
-- Find all claims connected to known fraudulent claims
-- Build fraud networks by traversing claim relationships
-- Identify policyholder networks within fraud rings
-- Detect suspicious claim chains
+- Start from a suspicious claim
+- Find all claims connected through shared policyholders (same address/phone)
+- Traverse the network recursively to reveal fraud rings
+- Calculate network statistics and fraud concentration
 
-### Example Recursive Query
+### 📦 Reusable Stored Procedures
 
-```sql
-WITH RECURSIVE fraud_network AS (
-  -- Base case: Start with known fraudulent claims
-  SELECT claim_id, policyholder_id, 0 as depth
-  FROM claims WHERE is_fraud = true
-  
-  UNION ALL
-  
-  -- Recursive case: Find connected claims
-  SELECT c.claim_id, c.policyholder_id, fn.depth + 1
-  FROM fraud_network fn
-  JOIN claim_relationships cr ON fn.claim_id = cr.claim_id_1
-  JOIN claims c ON c.claim_id = cr.claim_id_2
-  WHERE fn.depth < 5
-)
-SELECT * FROM fraud_network;
-```
+Two production-ready stored procedures:
+1. **`discover_fraud_network(claim_id, max_depth)`** - Main recursive CTE demonstration
+2. **`get_claim_relationships(claim_id)`** - Shows direct relationships and connection types
 
-### Fraud Risk Scoring
-
-The system calculates fraud risk scores based on:
-- Known fraud status (50 points)
-- Membership in fraud network (30 points)
-- High number of connections (20 points for >5 connections, 25 points for >10 connections)
-- High claim amount (15 points)
-
-Maximum score: 100 points
+These can be called interactively or integrated with AI agents for automated fraud detection.
 
 ## Dataset Details
 
@@ -143,6 +148,24 @@ Relationships are derived from data patterns and fall into three categories:
 3. **Service provider connections**: Claims handled by the same service provider (adjuster, repair shop, medical provider, attorney, etc.) within 90 days
 
 The recursive queries use these relationships to discover fraud networks.
+
+## How It Works
+
+### The Fraud Investigation Workflow
+
+The demo demonstrates a realistic fraud investigation process:
+
+1. **Data Generation (Notebook 01)**
+   - Generate synthetic insurance claims with realistic patterns
+   - Include fraud indicators (higher amounts, suspicious timing)
+   - Create relationships through shared attributes (address, phone, adjuster)
+
+2. **Fraud Detection (Notebook 02)**
+   - Identify suspicious high-value claims
+   - Use stored procedures to discover relationships
+   - **Apply recursive CTEs** to traverse the entire fraud network
+   - Visualize the network as an interactive graph
+   - Analyze network statistics and fraud concentration
 
 ### Fraud Rings (Discovery-Based)
 
