@@ -258,6 +258,10 @@ if use_batch_processing:
     
     print(f"  Processing batch 1/{num_batches} ({batch_size_actual:,} claims)...")
     
+    # Drop table first if overwrite mode to avoid schema conflicts
+    if overwrite_mode:
+        spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.claims")
+    
     # Generate claims using join with indexed policyholders (efficient random selection)
     claims_batch_df = spark.range(batch_start, batch_end).select(
         (col("id") + 1).alias("claim_num"),
@@ -283,7 +287,7 @@ if use_batch_processing:
                element_at(array([lit(ct) for ct in claim_types]), 
                          (rand() * len(claim_types) + 1).cast("int")), 
                lit(" incident")).alias("description"),
-        (rand() < lit(fraud_rate)).alias("is_fraud"),
+        (rand() < lit(fraud_rate)).cast(BooleanType()).alias("is_fraud"),
         format_string("ADJ%03d", (rand() * num_adjusters + 1).cast("int")).alias("adjuster_id"),
         ((rand() * 89 + 1).cast("int")).alias("processing_days")
     )
