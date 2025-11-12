@@ -35,17 +35,13 @@ schema = dbutils.widgets.get("schema")
 volume_scale = dbutils.widgets.get("volume_scale")
 fraud_rate = float(dbutils.widgets.get("fraud_rate"))
 num_adjusters = int(dbutils.widgets.get("num_adjusters"))
-batch_size = int(dbutils.widgets.get("batch_size"))
 overwrite_mode = dbutils.widgets.get("overwrite_mode") == "true"
 
-# Define volume scales
+# Define volume scales (optimized for recursive query performance)
 volume_configs = {
     "small": {"policyholders": 1_000, "claims": 5_000},
     "medium": {"policyholders": 10_000, "claims": 50_000},
-    "large": {"policyholders": 100_000, "claims": 1_000_000},
-    "xlarge": {"policyholders": 1_000_000, "claims": 10_000_000},
-    "custom": {"policyholders": int(dbutils.widgets.get("num_policyholders")), 
-               "claims": int(dbutils.widgets.get("num_claims"))}
+    "large": {"policyholders": 100_000, "claims": 1_000_000}
 }
 
 # Set volumes based on scale
@@ -55,6 +51,7 @@ num_claims = config["claims"]
 
 # Determine if we need batch processing (for large datasets)
 use_batch_processing = num_claims > 100_000
+batch_size = 1_000_000  # Fixed batch size for large datasets
 
 # Display configuration
 print("=" * 60)
@@ -67,7 +64,6 @@ print(f"Number of Policyholders: {num_policyholders:,}")
 print(f"Number of Claims: {num_claims:,}")
 print(f"Fraud Rate: {fraud_rate*100:.1f}%")
 print(f"Number of Adjusters: {num_adjusters}")
-print(f"Batch Size: {batch_size:,}" if use_batch_processing else "Batch Processing: Not needed")
 print(f"Overwrite Mode: {overwrite_mode}")
 print(f"Processing Mode: {'Batch Processing' if use_batch_processing else 'Standard Processing'}")
 print("=" * 60)
