@@ -424,240 +424,105 @@ bfs_result.show(50, truncate=False)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 7: Find Policyholder Networks (Shared Connections)
+# MAGIC ## Step 7: Summary Statistics (Non-Recursive Analysis)
 # MAGIC 
-# MAGIC Recursive query to find policyholders connected through shared claims or relationships.
-
-# COMMAND ----------
-
-# Create a policyholder relationship graph using on-demand relationships
-policyholder_network_df = spark.sql(f"""
-WITH policyholder_connections AS (
-  -- Direct connections: policyholders with shared attributes (address, phone)
-  SELECT DISTINCT
-    c1.policyholder_id as ph1,
-    c2.policyholder_id as ph2,
-    1 as connection_strength
-  FROM {catalog}.{schema}.claims c1
-  INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-  INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-  INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
-  WHERE c1.policyholder_id != c2.policyholder_id
-    AND (
-      (p1.address = p2.address AND p1.address IS NOT NULL) OR
-      (p1.phone = p2.phone AND p1.phone IS NOT NULL)
-    )
-  
-  UNION
-  
-  -- Indirect connections: policyholders with similar patterns
-  SELECT DISTINCT
-    c1.policyholder_id as ph1,
-    c2.policyholder_id as ph2,
-    0.5 as connection_strength
-  FROM {catalog}.{schema}.claims c1
-  INNER JOIN {catalog}.{schema}.claims c2
-    ON c1.claim_type = c2.claim_type
-    AND c1.policyholder_id != c2.policyholder_id
-    AND ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30
-    AND ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.2
-),
-
-RECURSIVE policyholder_network AS (
-  -- Base case: Start with policyholders who have fraudulent claims
-  SELECT DISTINCT
-    c.policyholder_id,
-    c.policyholder_id as root_policyholder,
-    0 as depth,
-    CAST(c.policyholder_id AS STRING) as path
-  FROM {catalog}.{schema}.claims c
-  WHERE c.is_fraud = true
-  
-  UNION ALL
-  
-  -- Recursive case: Find connected policyholders
-  SELECT 
-    pc.ph2 as policyholder_id,
-    pn.root_policyholder,
-    pn.depth + 1,
-    CONCAT(pn.path, ' -> ', pc.ph2)
-  FROM policyholder_network pn
-  INNER JOIN policyholder_connections pc
-    ON pn.policyholder_id = pc.ph1
-  WHERE pn.depth < 3
-    AND pc.ph2 != pn.policyholder_id
-    AND pn.path NOT LIKE CONCAT('%', pc.ph2, '%')
-)
-SELECT 
-  root_policyholder,
-  COUNT(DISTINCT policyholder_id) as network_size,
-  COLLECT_SET(policyholder_id) as network_members
-FROM policyholder_network
-GROUP BY root_policyholder
-HAVING network_size > 1
-ORDER BY network_size DESC
-""")
-policyholder_network_df.show(truncate=False)
+# MAGIC These queries provide useful insights without using recursion, making them fast and reliable for large datasets.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 8: Identify Suspicious Claim Patterns Using Recursion
+# MAGIC ### Fraud Statistics by Claim Type
+# MAGIC 
+# MAGIC This shows which claim types have the highest fraud rates.
 
 # COMMAND ----------
 
-# Recursive query to find chains of suspicious claims using on-demand relationships
-suspicious_chains_df = spark.sql(f"""
-WITH RECURSIVE suspicious_chain AS (
-  -- Base case: High-value claims
-  SELECT 
-    c.claim_id,
-    c.policyholder_id,
-    c.claim_amount,
-    c.claim_date,
-    0 as chain_length,
-    CAST(c.claim_id AS STRING) as chain_path,
-    c.claim_id as chain_start
-  FROM {catalog}.{schema}.claims c
-  WHERE c.claim_amount > 50000
-  
-  UNION ALL
-  
-  -- Recursive case: Find connected suspicious claims using on-demand relationships
-  SELECT 
-    c2.claim_id,
-    c2.policyholder_id,
-    c2.claim_amount,
-    c2.claim_date,
-    sc.chain_length + 1,
-    CONCAT(sc.chain_path, ' -> ', c2.claim_id),
-    sc.chain_start
-  FROM suspicious_chain sc
-  INNER JOIN {catalog}.{schema}.claims c1 ON sc.claim_id = c1.claim_id
-  INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-  INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-  INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
-  WHERE sc.chain_length < 4
-    AND sc.chain_path NOT LIKE CONCAT('%', c2.claim_id, '%')
-    AND (
-      (p1.address = p2.address AND p1.address IS NOT NULL) OR
-      (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-      (c1.claim_type = c2.claim_type AND 
-       ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30 AND
-       ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.3) OR
-      (c1.adjuster_id = c2.adjuster_id AND 
-       ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
-    )
-    AND (
-      c2.claim_amount > 30000
-      OR ABS(DATEDIFF(c2.claim_date, sc.claim_date)) < 90
-    )
-)
+fraud_by_type = spark.sql(f"""
 SELECT 
-  chain_start,
-  COUNT(DISTINCT claim_id) as chain_size,
-  SUM(claim_amount) as total_chain_amount,
-  MAX(chain_length) as max_chain_length,
-  COLLECT_SET(claim_id) as chain_claims,
-  MAX(chain_path) as full_chain_path
-FROM suspicious_chain
-GROUP BY chain_start
-HAVING chain_size >= 3
-ORDER BY total_chain_amount DESC, chain_size DESC
-LIMIT 15
+  claim_type,
+  COUNT(*) as total_claims,
+  SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) as fraud_count,
+  ROUND(SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as fraud_rate,
+  ROUND(AVG(claim_amount), 2) as avg_claim_amount,
+  ROUND(SUM(CASE WHEN is_fraud THEN claim_amount ELSE 0 END), 2) as total_fraud_amount
+FROM {catalog}.{schema}.claims
+GROUP BY claim_type
+ORDER BY fraud_rate DESC
 """)
-suspicious_chains_df.show(truncate=False)
+fraud_by_type.show()
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 9: Create Fraud Risk Score Using Network Analysis
+# MAGIC ### High-Risk Policyholders
+# MAGIC 
+# MAGIC Find policyholders with multiple claims or high claim amounts (potential fraud indicators).
 
 # COMMAND ----------
 
-# Calculate fraud risk scores based on network connections using on-demand relationships
-risk_scores_df = spark.sql(f"""
-WITH claim_connections AS (
-  -- Count connections using on-demand relationship computation
-  SELECT 
-    c1.claim_id,
-    COUNT(DISTINCT c2.claim_id) as connection_count
-  FROM {catalog}.{schema}.claims c1
-  INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-  LEFT JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-  LEFT JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
-  WHERE (
-    (p1.address = p2.address AND p1.address IS NOT NULL) OR
-    (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-    (c1.claim_type = c2.claim_type AND 
-     ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30 AND
-     ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.3) OR
-    (c1.adjuster_id = c2.adjuster_id AND 
-     ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
-  )
-  GROUP BY c1.claim_id
-),
-
-fraud_network_members AS (
-  SELECT DISTINCT claim_id
-  FROM (
-    WITH RECURSIVE fraud_network AS (
-      SELECT 
-        c.claim_id,
-        0 as depth,
-        CAST(c.claim_id AS STRING) as path
-      FROM {catalog}.{schema}.claims c
-      WHERE c.is_fraud = true
-      
-      UNION ALL
-      
-      SELECT 
-        c2.claim_id,
-        fn.depth + 1,
-        CONCAT(fn.path, ' -> ', c2.claim_id)
-      FROM fraud_network fn
-      INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
-      INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-      INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-      INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
-      WHERE fn.depth < 3
-        AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')
-        AND (
-          (p1.address = p2.address AND p1.address IS NOT NULL) OR
-          (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-          (c1.claim_type = c2.claim_type AND 
-           ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30 AND
-           ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.3) OR
-          (c1.adjuster_id = c2.adjuster_id AND 
-           ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
-        )
-    )
-    SELECT claim_id FROM fraud_network
-  )
-)
-
+high_risk_policyholders = spark.sql(f"""
 SELECT 
-  c.claim_id,
-  c.policyholder_id,
-  c.claim_type,
-  c.claim_amount,
-  c.claim_date,
-  c.is_fraud,
-  COALESCE(cc.connection_count, 0) as connection_count,
-  CASE WHEN fnm.claim_id IS NOT NULL THEN 1 ELSE 0 END as in_fraud_network,
-  -- Calculate risk score (0-100)
-  LEAST(100, 
-    (CASE WHEN c.is_fraud THEN 50 ELSE 0 END) +
-    (CASE WHEN fnm.claim_id IS NOT NULL THEN 30 ELSE 0 END) +
-    (CASE WHEN COALESCE(cc.connection_count, 0) > 5 THEN 20 ELSE 0 END) +
-    (CASE WHEN c.claim_amount > 50000 THEN 15 ELSE 0 END) +
-    (CASE WHEN COALESCE(cc.connection_count, 0) > 10 THEN 25 ELSE 0 END)
-  ) as fraud_risk_score
-FROM {catalog}.{schema}.claims c
-LEFT JOIN claim_connections cc ON c.claim_id = cc.claim_id
-LEFT JOIN fraud_network_members fnm ON c.claim_id = fnm.claim_id
-ORDER BY fraud_risk_score DESC, c.claim_amount DESC
-LIMIT 50
+  p.policyholder_id,
+  p.name,
+  p.city,
+  p.state,
+  COUNT(c.claim_id) as claim_count,
+  SUM(CASE WHEN c.is_fraud THEN 1 ELSE 0 END) as fraud_count,
+  ROUND(SUM(c.claim_amount), 2) as total_claim_amount,
+  ROUND(AVG(c.claim_amount), 2) as avg_claim_amount
+FROM {catalog}.{schema}.policyholders p
+INNER JOIN {catalog}.{schema}.claims c ON p.policyholder_id = c.policyholder_id
+GROUP BY p.policyholder_id, p.name, p.city, p.state
+HAVING claim_count >= 3 OR SUM(c.claim_amount) > 100000
+ORDER BY fraud_count DESC, total_claim_amount DESC
+LIMIT 20
 """)
-risk_scores_df.show(50, truncate=False)
+high_risk_policyholders.show(truncate=False)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Shared Address Analysis
+# MAGIC 
+# MAGIC Find addresses with multiple policyholders (potential fraud ring indicator).
+
+# COMMAND ----------
+
+shared_addresses = spark.sql(f"""
+SELECT 
+  p.address,
+  p.city,
+  p.state,
+  COUNT(DISTINCT p.policyholder_id) as policyholder_count,
+  COUNT(DISTINCT c.claim_id) as total_claims,
+  SUM(CASE WHEN c.is_fraud THEN 1 ELSE 0 END) as fraud_claims,
+  ROUND(SUM(c.claim_amount), 2) as total_claim_amount
+FROM {catalog}.{schema}.policyholders p
+INNER JOIN {catalog}.{schema}.claims c ON p.policyholder_id = c.policyholder_id
+GROUP BY p.address, p.city, p.state
+HAVING policyholder_count > 1
+ORDER BY fraud_claims DESC, policyholder_count DESC
+LIMIT 20
+""")
+shared_addresses.show(truncate=False)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Production Usage Notes
+# MAGIC 
+# MAGIC ### Recommended Workflow for Fraud Investigation:
+# MAGIC 
+# MAGIC 1. **Identify Suspicious Claims**: Use non-recursive queries (like Step 7) to find high-risk claims or policyholders
+# MAGIC 2. **Investigate Specific Claims**: Use `discover_fraud_network_for_claim()` to explore networks around suspicious claims
+# MAGIC 3. **Investigate Policyholders**: Use `discover_fraud_network_for_policyholder()` to explore all claims in a policyholder's network
+# MAGIC 4. **Get Detailed Relationships**: Use `get_claim_relationships()` to see what connects two claims
+# MAGIC 5. **BFS Exploration**: Use `fraud_network_bfs()` for detailed path analysis from a specific claim
+# MAGIC 
+# MAGIC ### Performance Tips:
+# MAGIC 
+# MAGIC - Start with `max_depth=2` or `max_depth=3` for initial exploration
+# MAGIC - Only increase depth if you need to go further into the network
+# MAGIC - Use the non-recursive queries in Step 7 to identify candidates for recursive investigation
+# MAGIC - The stored procedures are optimized for individual claim/policyholder investigation, not bulk processing
 
