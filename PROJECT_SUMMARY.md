@@ -6,13 +6,14 @@ This demo project provides a complete solution for fraud detection using Databri
 
 ### 📁 Files Created
 
-1. **Dataset Generator** (`generate_fraud_dataset.py`)
-   - Generates synthetic insurance claim data
+1. **Dataset Generator** (`01_Dataset_Generation.py`)
+   - Generates synthetic insurance claim data directly in Databricks
    - Creates fraud rings and networks
    - Produces realistic fraud patterns
+   - Supports volume scales from small (5K claims) to 100M+ records
 
 2. **Databricks Notebooks** (`notebooks/`)
-   - `01_Data_Ingestion.py` - Loads data into Delta tables
+   - `01_Dataset_Generation.py` - Generate dataset with volume controls
    - `02_Recursive_Fraud_Detection.py` - Recursive fraud network detection
    - `03_Fraud_Analysis_Visualization.py` - Analysis and reporting
 
@@ -26,7 +27,6 @@ This demo project provides a complete solution for fraud detection using Databri
    - `PROJECT_SUMMARY.md` - This file
 
 5. **Configuration**
-   - `requirements.txt` - Python dependencies
    - `.gitignore` - Git ignore rules
 
 ## Key Features
@@ -52,18 +52,10 @@ This demo project provides a complete solution for fraud detection using Databri
 ## How to Use
 
 ### Quick Start
-```bash
-# 1. Generate dataset
-pip install -r requirements.txt
-python generate_fraud_dataset.py
-
-# 2. Upload to Databricks
-# Upload CSV files from data/ to /FileStore/fraud_demo/
-
-# 3. Import and run notebooks
-# Import notebooks from notebooks/ directory
-# Run in sequence: 01 → 02 → 03
-```
+1. Import notebooks from `notebooks/` directory into Databricks
+2. Run `01_Dataset_Generation.py` - Configure widgets and generate dataset
+3. Run `02_Recursive_Fraud_Detection.py` - Detect fraud networks
+4. Run `03_Fraud_Analysis_Visualization.py` - Analyze and visualize results
 
 ### Expected Results
 
@@ -103,20 +95,12 @@ SELECT * FROM fraud_network;
 ## Customization Options
 
 ### Adjust Dataset Size
-```python
-# In generate_fraud_dataset.py
-policyholders_df = generate_policyholders(n=5000)  # More policyholders
-claims_df, fraud_rings = generate_claims(policyholders_df, n_claims=20000)  # More claims
-```
+Use the widgets in `01_Dataset_Generation.py`:
+- Select **Volume Scale**: small, medium, large, xlarge, or custom
+- For custom: Set **Number of Policyholders** and **Number of Claims**
 
 ### Modify Fraud Rate
-```python
-claims_df, fraud_rings = generate_claims(
-    policyholders_df, 
-    n_claims=5000, 
-    fraud_rate=0.20  # 20% fraud rate
-)
-```
+Use the **Fraud Rate** widget in `01_Dataset_Generation.py` (0.0-1.0 range)
 
 ### Change Recursion Depth
 ```sql
