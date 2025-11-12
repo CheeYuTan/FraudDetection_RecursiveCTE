@@ -186,9 +186,7 @@ claims_df, fraud_rings = generate_claims(policyholders_df, n_claims=20000)  # Mo
 
 ### Issue: Recursive CTE not supported
 
-**Solution**: Ensure you're using **Databricks Runtime 17.0 or later**. Recursive CTEs require:
-- Databricks Runtime 17.0+ (recommended)
-- Or Databricks Runtime 13.3 LTS+ with recursive CTE support enabled
+**Solution**: Ensure you're using **Databricks Runtime 17.0 or later**. Recursive CTEs are only supported in Runtime 17.0 and later.
 
 ### Issue: Files not found in DBFS
 
