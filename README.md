@@ -189,41 +189,6 @@ WHERE fn.depth < 5  -- Change to desired depth
 
 **Solution**: Ensure you're using **Databricks Runtime 17.0 or later**. Recursive CTEs are only supported in Runtime 17.0 and later.
 
-### Issue: Files not found in DBFS
-
-**Solution**: Verify file paths. Use:
-```python
-dbutils.fs.ls("/FileStore/fraud_demo/")
-```
-
-### Issue: Memory errors with large datasets
-
-**Solution**: 
-- Reduce recursion depth
-- Limit the number of base cases
-- Use more restrictive WHERE clauses
-
-## Performance Tips
-
-1. **Index Relationships**: Create indexes on relationship columns for faster joins
-2. **Limit Depth**: Keep recursion depth reasonable (< 10 levels)
-3. **Filter Early**: Apply filters in the base case of recursive CTEs
-4. **Partition Data**: Partition large tables by date or claim type
-
-## Next Steps
-
-- Integrate with real-time fraud detection pipelines
-- Add machine learning models for fraud prediction
-- Create automated alerts for high-risk claims
-- Build dashboards for fraud analysts
-- Implement graph algorithms using GraphX
-
-## References
-
-- [Databricks SQL Documentation](https://docs.databricks.com/sql/)
-- [Recursive CTEs in Spark SQL](https://spark.apache.org/docs/latest/sql-ref-syntax-qry-select-cte.html)
-- [Delta Lake Documentation](https://docs.delta.io/)
-
 ## License
 
 This demo is provided as-is for educational and demonstration purposes.

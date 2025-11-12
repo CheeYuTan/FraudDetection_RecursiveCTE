@@ -59,11 +59,6 @@ The demo showcases:
 **"Recursive CTE not supported"**
 - Use **Databricks Runtime 17.0 or later** (required)
 
-**"Out of memory"**
-- Reduce dataset size (use widgets in `01_Dataset_Generation.py`)
-- Lower recursion depth
-- Add more filters
-
 ## Need Help?
 
 See the full [README.md](README.md) for detailed documentation.
