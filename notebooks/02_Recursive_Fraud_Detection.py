@@ -3,6 +3,9 @@
 # MAGIC # Insurance Fraud Detection - Recursive Network Analysis
 # MAGIC 
 # MAGIC This notebook demonstrates recursive SQL capabilities in Databricks to detect fraud networks and connected claims.
+# MAGIC 
+# MAGIC **Requirements:**
+# MAGIC - Databricks Runtime 17.0 or later (required for recursive CTE support)
 
 # COMMAND ----------
 
@@ -27,6 +30,22 @@ print(f"Using catalog: {catalog}, schema: {schema}")
 # MAGIC ## Step 2: Setup
 
 # COMMAND ----------
+
+# Check Databricks Runtime version
+try:
+    runtime_version = spark.conf.get("spark.databricks.clusterUsageTags.sparkVersion")
+    print(f"Databricks Runtime: {runtime_version}")
+    import re
+    version_match = re.search(r'(\d+)\.(\d+)', runtime_version)
+    if version_match:
+        major, minor = int(version_match.group(1)), int(version_match.group(2))
+        if major < 17 or (major == 17 and minor < 0):
+            print("⚠️  WARNING: This project requires Databricks Runtime 17.0 or later.")
+            print("   Recursive CTEs may not work correctly with older versions.")
+    else:
+        print("⚠️  Unable to determine runtime version. Please ensure you're using Runtime 17.0+")
+except Exception as e:
+    print("⚠️  Could not check runtime version. Please ensure you're using Databricks Runtime 17.0+")
 
 spark.sql(f"USE {catalog}.{schema}")
 

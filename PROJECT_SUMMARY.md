@@ -95,6 +95,7 @@ SELECT * FROM fraud_network;
 
 ### Key Technologies
 - **Databricks**: Cloud data platform
+- **Databricks Runtime**: 17.0 or later (required)
 - **Delta Lake**: ACID transactions and time travel
 - **Spark SQL**: Distributed query engine
 - **Recursive CTEs**: Graph traversal capabilities

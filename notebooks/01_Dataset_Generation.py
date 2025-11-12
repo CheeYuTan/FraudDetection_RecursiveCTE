@@ -4,6 +4,9 @@
 # MAGIC 
 # MAGIC This notebook generates synthetic insurance claim fraud data and writes it directly to Delta tables.
 # MAGIC 
+# MAGIC **Requirements:**
+# MAGIC - Databricks Runtime 17.0 or later
+# MAGIC 
 # MAGIC **Configure the widgets below to customize the dataset generation.**
 
 # COMMAND ----------
@@ -93,6 +96,23 @@ from pyspark.sql.types import StructType, StructField, StringType, IntegerType, 
 # Set random seed for reproducibility
 np.random.seed(42)
 random.seed(42)
+
+# Check Databricks Runtime version
+try:
+    runtime_version = spark.conf.get("spark.databricks.clusterUsageTags.sparkVersion")
+    print(f"Databricks Runtime: {runtime_version}")
+    # Extract version number (e.g., "17.0" from "17.0.x-scala2.12")
+    import re
+    version_match = re.search(r'(\d+)\.(\d+)', runtime_version)
+    if version_match:
+        major, minor = int(version_match.group(1)), int(version_match.group(2))
+        if major < 17 or (major == 17 and minor < 0):
+            print("⚠️  WARNING: This project requires Databricks Runtime 17.0 or later.")
+            print("   Some features may not work correctly with older versions.")
+    else:
+        print("⚠️  Unable to determine runtime version. Please ensure you're using Runtime 17.0+")
+except Exception as e:
+    print("⚠️  Could not check runtime version. Please ensure you're using Databricks Runtime 17.0+")
 
 # Create database/schema if it doesn't exist
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")

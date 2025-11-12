@@ -28,7 +28,7 @@ The demo includes:
 ## Prerequisites
 
 - Databricks workspace (or Databricks Community Edition)
-- Databricks Runtime 9.1+ (for recursive CTE support)
+- **Databricks Runtime 17.0 or later** (required for recursive CTE support and optimized performance)
 
 ## Setup Instructions
 
@@ -192,9 +192,9 @@ claims_df, fraud_rings = generate_claims(policyholders_df, n_claims=20000)  # Mo
 
 ### Issue: Recursive CTE not supported
 
-**Solution**: Ensure you're using Databricks SQL or Spark SQL 3.0+. Recursive CTEs require:
-- Databricks Runtime 9.1+ or
-- Spark 3.0+ with recursive CTE support
+**Solution**: Ensure you're using **Databricks Runtime 17.0 or later**. Recursive CTEs require:
+- Databricks Runtime 17.0+ (recommended)
+- Or Databricks Runtime 13.3 LTS+ with recursive CTE support enabled
 
 ### Issue: Files not found in DBFS
 

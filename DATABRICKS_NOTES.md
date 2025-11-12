@@ -3,9 +3,11 @@
 ## Recursive CTE Support
 
 Recursive Common Table Expressions (CTEs) are supported in:
-- **Databricks SQL**: Runtime 9.1+ (Photon enabled)
-- **Spark SQL**: Version 3.0+ with recursive CTE support
-- **Databricks Runtime**: 9.1 LTS or higher
+- **Databricks Runtime**: **17.0 or later** (required)
+- **Databricks SQL**: Runtime 17.0+ (Photon enabled)
+- **Spark SQL**: Version 3.5+ with recursive CTE support
+
+**Note**: This project requires Databricks Runtime 17.0 or later for optimal performance and full feature support.
 
 ### Checking Your Version
 
@@ -133,7 +135,7 @@ spark.sql("""
 ## Cluster Configuration
 
 Recommended cluster settings:
-- **Runtime**: Databricks Runtime 11.3 LTS or higher
+- **Runtime**: **Databricks Runtime 17.0 or later** (required)
 - **Node Type**: Standard (for demo) or Memory-optimized (for production)
 - **Workers**: 2-4 workers for demo, scale up for production
 - **Photon**: Enable for better SQL performance
@@ -141,7 +143,7 @@ Recommended cluster settings:
 ## Troubleshooting
 
 ### Issue: "Recursive CTE syntax error"
-**Solution**: Check if your Databricks version supports recursive CTEs. Use alternative approaches above.
+**Solution**: Ensure you're using **Databricks Runtime 17.0 or later**. If using an older version, use alternative approaches above.
 
 ### Issue: "Out of memory during recursion"
 **Solution**: 

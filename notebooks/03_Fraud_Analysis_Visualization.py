@@ -3,6 +3,9 @@
 # MAGIC # Insurance Fraud Detection - Analysis and Visualization
 # MAGIC 
 # MAGIC This notebook provides comprehensive fraud analysis and visualizations.
+# MAGIC 
+# MAGIC **Requirements:**
+# MAGIC - Databricks Runtime 17.0 or later
 
 # COMMAND ----------
 

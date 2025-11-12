@@ -56,7 +56,7 @@ The demo showcases:
 ## Troubleshooting
 
 **"Recursive CTE not supported"**
-- Use Databricks Runtime 9.1+ or Spark 3.0+
+- Use **Databricks Runtime 17.0 or later** (required)
 
 **"Out of memory"**
 - Reduce dataset size (use widgets in `01_Dataset_Generation.py`)
