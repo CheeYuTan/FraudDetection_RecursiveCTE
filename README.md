@@ -15,6 +15,7 @@ The demo includes:
 ```
 .
 ├── README.md                          # This file
+├── PRODUCTION_APPROACH.md             # Guide for adapting to real data
 ├── notebooks/                         # Databricks notebooks
 │   ├── 01_Dataset_Generation.py     # ⭐ Generate dataset directly in Databricks
 │   ├── 02_Recursive_Fraud_Detection.py  # Recursive fraud detection queries
