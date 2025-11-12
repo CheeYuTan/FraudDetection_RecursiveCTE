@@ -78,7 +78,6 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 AS
-$$
   WITH RECURSIVE fraud_network AS (
     SELECT 
       c.claim_id,
@@ -119,7 +118,6 @@ $$
       )
   )
   SELECT * FROM fraud_network
-$$
 """)
 
 # COMMAND ----------
@@ -140,7 +138,6 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 AS
-$$
   WITH RECURSIVE fraud_network AS (
     SELECT 
       c.claim_id,
@@ -191,7 +188,6 @@ $$
   GROUP BY root_claim_id
   HAVING network_size >= min_network_size
   ORDER BY network_size DESC, total_network_amount DESC
-$$
 """)
 
 # COMMAND ----------
@@ -209,7 +205,6 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 AS
-$$
   WITH target_claim AS (
     SELECT 
       c.claim_id,
@@ -267,7 +262,6 @@ $$
       AND ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 90
   )
   SELECT * FROM related_claims
-$$
 """)
 
 # COMMAND ----------
@@ -288,7 +282,6 @@ RETURNS TABLE (
 )
 LANGUAGE SQL
 AS
-$$
   WITH RECURSIVE fraud_network AS (
     SELECT 
       c.claim_id,
@@ -338,7 +331,6 @@ $$
   GROUP BY root_claim_id
   HAVING network_size >= min_network_size
   ORDER BY network_size DESC, total_network_amount DESC
-$$
 """)
 
 # COMMAND ----------
