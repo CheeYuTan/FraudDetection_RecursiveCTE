@@ -68,6 +68,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.fraud_network_bfs(
   max_depth INT
 )
 LANGUAGE SQL
+SQL SECURITY INVOKER
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
@@ -122,6 +123,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks(
   min_network_size INT DEFAULT 2
 )
 LANGUAGE SQL
+SQL SECURITY INVOKER
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
@@ -186,6 +188,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.get_claim_relationships(
   target_claim_id STRING
 )
 LANGUAGE SQL
+SQL SECURITY INVOKER
 AS
 BEGIN
   WITH target_claim AS (
@@ -258,6 +261,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks_ondemand(
   min_network_size INT DEFAULT 2
 )
 LANGUAGE SQL
+SQL SECURITY INVOKER
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
