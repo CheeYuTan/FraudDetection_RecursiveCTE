@@ -493,113 +493,262 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5: Summary Statistics (Non-Recursive Analysis)
+# MAGIC ### Step 4e: Multi-Entity Network Graph (Advanced)
 # MAGIC 
-# MAGIC These queries provide useful insights without using recursion, making them fast and reliable for large datasets.
+# MAGIC Let's create a more sophisticated network showing the relationships between:
+# MAGIC - **Claims** (center of investigation)
+# MAGIC - **Policyholders** (who filed the claims)
+# MAGIC - **Service Providers** (adjusters who processed the claims)
+# MAGIC 
+# MAGIC This reveals the full ecosystem of a fraud network!
+
+# COMMAND ----------
+
+if network_count > 0:
+    print("🎨 Creating multi-entity network graph...\n")
+    
+    # Get policyholder and adjuster information for the network
+    network_with_details = network_df.toPandas()
+    
+    # Create a multi-partite graph
+    G_multi = nx.Graph()
+    
+    # Track entity types for coloring
+    claim_nodes = set()
+    policyholder_nodes = set()
+    adjuster_nodes = set()
+    
+    # Get unique policyholders and adjusters in the network
+    policyholders_in_network = network_with_details['policyholder_id'].unique()
+    
+    # Get adjuster information
+    adjusters_df = spark.sql(f"""
+        SELECT DISTINCT c.adjuster_id, a.name as adjuster_name, a.department
+        FROM {catalog}.{schema}.claims c
+        INNER JOIN {catalog}.{schema}.adjusters a ON c.adjuster_id = a.adjuster_id
+        WHERE c.claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
+    """).toPandas()
+    
+    # Add claim nodes
+    for idx, row in network_with_details.iterrows():
+        claim_id = row['claim_id']
+        G_multi.add_node(claim_id, 
+                        node_type='claim',
+                        amount=row['claim_amount'],
+                        is_fraud=row['is_fraud'],
+                        claim_type=row['claim_type'])
+        claim_nodes.add(claim_id)
+        
+        # Add policyholder node
+        ph_id = row['policyholder_id']
+        if ph_id not in G_multi:
+            G_multi.add_node(ph_id, node_type='policyholder')
+            policyholder_nodes.add(ph_id)
+        
+        # Connect claim to policyholder
+        G_multi.add_edge(claim_id, ph_id, edge_type='filed_by')
+    
+    # Add adjuster nodes and connections
+    for idx, row in adjusters_df.iterrows():
+        adj_id = row['adjuster_id']
+        if adj_id not in G_multi:
+            G_multi.add_node(adj_id, 
+                           node_type='adjuster',
+                           department=row['department'])
+            adjuster_nodes.add(adj_id)
+        
+        # Connect adjusters to their claims
+        adj_claims = network_with_details[network_with_details['claim_id'].isin(
+            spark.sql(f"""
+                SELECT claim_id 
+                FROM {catalog}.{schema}.claims 
+                WHERE adjuster_id = '{adj_id}'
+                AND claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
+            """).toPandas()['claim_id'].tolist() if spark.sql(f"""
+                SELECT claim_id 
+                FROM {catalog}.{schema}.claims 
+                WHERE adjuster_id = '{adj_id}'
+                AND claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
+            """).count() > 0 else []
+        )]
+        
+        for claim_id in adj_claims['claim_id']:
+            G_multi.add_edge(adj_id, claim_id, edge_type='processed_by')
+    
+    # Create visualization with different layouts
+    plt.figure(figsize=(20, 16))
+    
+    # Use spring layout for better visualization
+    pos = nx.spring_layout(G_multi, k=3, iterations=100, seed=42)
+    
+    # Prepare node colors and sizes by type
+    node_colors = []
+    node_sizes = []
+    node_shapes = []
+    
+    for node in G_multi.nodes():
+        node_data = G_multi.nodes[node]
+        
+        if node_data['node_type'] == 'claim':
+            # Claims: Red for fraud, Blue for legitimate
+            if node_data['is_fraud']:
+                node_colors.append('#ff4444')  # Red
+            else:
+                node_colors.append('#4477ff')  # Blue
+            # Size based on claim amount
+            node_sizes.append(max(500, min(4000, node_data['amount'] / 50)))
+        elif node_data['node_type'] == 'policyholder':
+            # Policyholders: Orange
+            node_colors.append('#ff9933')
+            node_sizes.append(800)
+        else:  # adjuster
+            # Adjusters: Green
+            node_colors.append('#44dd44')
+            node_sizes.append(1200)
+    
+    # Draw nodes
+    nx.draw_networkx_nodes(
+        G_multi, pos,
+        node_color=node_colors,
+        node_size=node_sizes,
+        alpha=0.85,
+        edgecolors='black',
+        linewidths=2.5
+    )
+    
+    # Draw edges with different styles
+    claim_ph_edges = [(u, v) for u, v, d in G_multi.edges(data=True) if d.get('edge_type') == 'filed_by']
+    claim_adj_edges = [(u, v) for u, v, d in G_multi.edges(data=True) if d.get('edge_type') == 'processed_by']
+    other_edges = [(u, v) for u, v, d in G_multi.edges(data=True) if 'edge_type' not in d]
+    
+    # Claim to policyholder edges (solid)
+    nx.draw_networkx_edges(
+        G_multi, pos,
+        edgelist=claim_ph_edges,
+        edge_color='#666666',
+        width=2,
+        alpha=0.6,
+        style='solid'
+    )
+    
+    # Claim to adjuster edges (dashed)
+    nx.draw_networkx_edges(
+        G_multi, pos,
+        edgelist=claim_adj_edges,
+        edge_color='#44dd44',
+        width=2,
+        alpha=0.5,
+        style='dashed'
+    )
+    
+    # Other edges (fraud network connections)
+    nx.draw_networkx_edges(
+        G_multi, pos,
+        edgelist=other_edges,
+        edge_color='#999999',
+        width=1,
+        alpha=0.3
+    )
+    
+    # Add labels
+    labels = {}
+    for node in G_multi.nodes():
+        node_data = G_multi.nodes[node]
+        if node_data['node_type'] == 'claim':
+            labels[node] = node[:10]  # Shortened claim ID
+        elif node_data['node_type'] == 'policyholder':
+            labels[node] = f"PH\n{node[-4:]}"  # Last 4 digits
+        else:  # adjuster
+            labels[node] = f"ADJ\n{node[-3:]}"  # Last 3 digits
+    
+    nx.draw_networkx_labels(
+        G_multi, pos,
+        labels,
+        font_size=7,
+        font_weight='bold',
+        font_color='white'
+    )
+    
+    # Add legend
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Patch(facecolor='#ff4444', edgecolor='black', label='Fraudulent Claim'),
+        Patch(facecolor='#4477ff', edgecolor='black', label='Legitimate Claim'),
+        Patch(facecolor='#ff9933', edgecolor='black', label='Policyholder'),
+        Patch(facecolor='#44dd44', edgecolor='black', label='Adjuster/Service Provider'),
+        Line2D([0], [0], color='#666666', linewidth=2, label='Filed By'),
+        Line2D([0], [0], color='#44dd44', linewidth=2, linestyle='--', label='Processed By')
+    ]
+    plt.legend(handles=legend_elements, loc='upper right', fontsize=12, framealpha=0.95)
+    
+    plt.title(f"Multi-Entity Fraud Network - Starting from Claim {target_claim_id}\n"
+              f"Claims: {len(claim_nodes)} | Policyholders: {len(policyholder_nodes)} | Adjusters: {len(adjuster_nodes)}",
+              fontsize=18, fontweight='bold', pad=20)
+    plt.axis('off')
+    plt.tight_layout()
+    
+    # Display the graph
+    display(plt.show())
+    
+    print("\n📊 Multi-Entity Graph Interpretation:")
+    print(f"  • Red circles = Fraudulent claims")
+    print(f"  • Blue circles = Legitimate claims")
+    print(f"  • Orange circles = Policyholders who filed the claims")
+    print(f"  • Green circles = Adjusters/Service providers who processed claims")
+    print(f"  • Solid lines = 'Filed by' relationships (claim → policyholder)")
+    print(f"  • Dashed green lines = 'Processed by' relationships (claim → adjuster)")
+    print(f"  • Circle size = Claim amount (for claim nodes)")
+    print(f"\n💡 This shows the full fraud ecosystem:")
+    print(f"  • How multiple claims connect through shared policyholders")
+    print(f"  • Which adjusters handled suspicious claims")
+    print(f"  • Potential coordination between entities")
+    
+else:
+    print("⚠️  No network to visualize - claim appears to be isolated")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Fraud Statistics by Claim Type
-# MAGIC 
-# MAGIC This shows which claim types have the highest fraud rates.
-
-# COMMAND ----------
-
-fraud_by_type = spark.sql(f"""
-SELECT 
-  claim_type,
-  COUNT(*) as total_claims,
-  SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) as fraud_count,
-  ROUND(SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as fraud_rate,
-  ROUND(AVG(claim_amount), 2) as avg_claim_amount,
-  ROUND(SUM(CASE WHEN is_fraud THEN claim_amount ELSE 0 END), 2) as total_fraud_amount
-FROM {catalog}.{schema}.claims
-GROUP BY claim_type
-ORDER BY fraud_rate DESC
-""")
-fraud_by_type.show()
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### High-Risk Policyholders
-# MAGIC 
-# MAGIC Find policyholders with multiple claims or high claim amounts (potential fraud indicators).
-
-# COMMAND ----------
-
-high_risk_policyholders = spark.sql(f"""
-SELECT 
-  p.policyholder_id,
-  p.name,
-  p.city,
-  p.state,
-  COUNT(c.claim_id) as claim_count,
-  SUM(CASE WHEN c.is_fraud THEN 1 ELSE 0 END) as fraud_count,
-  ROUND(SUM(c.claim_amount), 2) as total_claim_amount,
-  ROUND(AVG(c.claim_amount), 2) as avg_claim_amount
-FROM {catalog}.{schema}.policyholders p
-INNER JOIN {catalog}.{schema}.claims c ON p.policyholder_id = c.policyholder_id
-GROUP BY p.policyholder_id, p.name, p.city, p.state
-HAVING claim_count >= 3 OR SUM(c.claim_amount) > 100000
-ORDER BY fraud_count DESC, total_claim_amount DESC
-LIMIT 20
-""")
-high_risk_policyholders.show(truncate=False)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Shared Address Analysis
-# MAGIC 
-# MAGIC Find addresses with multiple policyholders (potential fraud ring indicator).
-
-# COMMAND ----------
-
-shared_addresses = spark.sql(f"""
-SELECT 
-  p.address,
-  p.city,
-  p.state,
-  COUNT(DISTINCT p.policyholder_id) as policyholder_count,
-  COUNT(DISTINCT c.claim_id) as total_claims,
-  SUM(CASE WHEN c.is_fraud THEN 1 ELSE 0 END) as fraud_claims,
-  ROUND(SUM(c.claim_amount), 2) as total_claim_amount
-FROM {catalog}.{schema}.policyholders p
-INNER JOIN {catalog}.{schema}.claims c ON p.policyholder_id = c.policyholder_id
-GROUP BY p.address, p.city, p.state
-HAVING policyholder_count > 1
-ORDER BY fraud_claims DESC, policyholder_count DESC
-LIMIT 20
-""")
-shared_addresses.show(truncate=False)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Production Usage Guide
+# MAGIC ## Step 5: Production Usage Guide
 # MAGIC 
 # MAGIC ### Recommended Workflow for Fraud Investigation:
 # MAGIC 
-# MAGIC 1. **Identify Suspicious Claims**: Use non-recursive queries (Step 5) or ML models to find high-risk claims
+# MAGIC 1. **Identify Suspicious Claims**: Use ML models, rules engines, or manual reports
 # MAGIC 2. **Understand Relationships**: Call `get_claim_relationships(claim_id)` to see direct connections
 # MAGIC 3. **Discover Network**: Call `discover_fraud_network(claim_id, depth)` to reveal the full fraud ring using recursive CTEs
-# MAGIC 4. **Take Action**: Prioritize investigation of connected high-value or fraudulent claims in the network
+# MAGIC 4. **Visualize**: Use the network graphs to understand the fraud ecosystem
+# MAGIC 5. **Take Action**: Prioritize investigation of connected high-value or fraudulent claims
 # MAGIC 
 # MAGIC ### Performance Tips:
 # MAGIC 
 # MAGIC - **Start with `max_depth=2` or `3`**: Recursion grows exponentially, so start shallow
 # MAGIC - **Investigate specific claims**: These procedures are designed for targeted investigation, not bulk processing
-# MAGIC - **Use Step 5 for bulk analysis**: Non-recursive queries are faster for finding candidates
 # MAGIC - **Adjust based on results**: If you find a large network, reduce depth; if isolated, try increasing
+# MAGIC - **Use visualizations**: The multi-entity graph reveals patterns not visible in tables
 # MAGIC 
 # MAGIC ### Integration with Agentic Systems:
 # MAGIC 
-# MAGIC These stored procedures can be called by AI agents:
+# MAGIC These stored procedures can be called by AI agents for automated fraud detection:
+# MAGIC 
 # MAGIC ```python
-# MAGIC # Agent receives suspicious claim ID
-# MAGIC result = spark.sql(f"CALL discover_fraud_network('{claim_id}', 3)")
-# MAGIC # Agent analyzes network and takes action
+# MAGIC # Agent receives suspicious claim ID from alerting system
+# MAGIC relationships = spark.sql(f"CALL get_claim_relationships('{claim_id}')")
+# MAGIC network = spark.sql(f"CALL discover_fraud_network('{claim_id}', 3)")
+# MAGIC 
+# MAGIC # Agent analyzes network metrics
+# MAGIC fraud_rate = network.filter("is_fraud = true").count() / network.count()
+# MAGIC 
+# MAGIC # Agent takes action based on fraud concentration
+# MAGIC if fraud_rate > 0.5:
+# MAGIC     escalate_to_investigators(claim_id, network)
 # MAGIC ```
+# MAGIC 
+# MAGIC ### What Makes This Demo Powerful:
+# MAGIC 
+# MAGIC ✅ **Recursive CTEs**: Traverse complex fraud networks efficiently  
+# MAGIC ✅ **On-Demand Relationships**: No pre-computed tables needed  
+# MAGIC ✅ **Multi-Entity Visualization**: See claims, policyholders, and service providers together  
+# MAGIC ✅ **Production-Ready**: Stored procedures can be deployed and used by agents  
+# MAGIC ✅ **Scalable**: Optimized for Databricks with depth limits and targeted queries
 
