@@ -348,56 +348,30 @@ print("\nYou can now use these stored procedures as reusable tools!")
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Recursive CTE to find connected fraud networks
-# MAGIC -- Uses pre-generated relationships if available, otherwise computes on-demand using UNION
-# MAGIC WITH RECURSIVE fraud_network AS (
-# MAGIC   -- Base case: Start with known fraudulent claims
-# MAGIC   SELECT 
-# MAGIC     c.claim_id,
-# MAGIC     c.policyholder_id,
-# MAGIC     c.claim_amount,
-# MAGIC     c.is_fraud,
-# MAGIC     0 as depth,
-# MAGIC     CAST(c.claim_id AS STRING) as path,
-# MAGIC     c.claim_id as root_claim_id
-# MAGIC   FROM ${catalog}.${schema}.claims c
-# MAGIC   WHERE c.is_fraud = true
-# MAGIC   
-# MAGIC   UNION ALL
-# MAGIC   
-# MAGIC   -- Recursive case: Find connected claims
-# MAGIC   -- Uses pre-generated relationships if available
-# MAGIC   SELECT 
-# MAGIC     c.claim_id,
-# MAGIC     c.policyholder_id,
-# MAGIC     c.claim_amount,
-# MAGIC     c.is_fraud,
-# MAGIC     fn.depth + 1,
-# MAGIC     CONCAT(fn.path, ' -> ', c.claim_id) as path,
-# MAGIC     fn.root_claim_id
-# MAGIC   FROM fraud_network fn
-# MAGIC   INNER JOIN ${catalog}.${schema}.claim_relationships cr 
-# MAGIC     ON (fn.claim_id = cr.claim_id_1 OR fn.claim_id = cr.claim_id_2)
-# MAGIC   INNER JOIN ${catalog}.${schema}.claims c
-# MAGIC     ON (c.claim_id = CASE 
-# MAGIC         WHEN fn.claim_id = cr.claim_id_1 THEN cr.claim_id_2 
-# MAGIC         ELSE cr.claim_id_1 
-# MAGIC       END)
-# MAGIC   WHERE fn.depth < 5  -- Limit recursion depth
-# MAGIC     AND c.claim_id != fn.claim_id
-# MAGIC     AND fn.path NOT LIKE CONCAT('%', c.claim_id, '%')  -- Prevent cycles
+# MAGIC -- Use stored procedure to discover fraud networks
+# MAGIC -- Works with pre-generated relationships table
+# MAGIC CALL ${catalog}.${schema}.discover_fraud_networks(
+# MAGIC   max_depth => 5,
+# MAGIC   min_network_size => 2
 # MAGIC )
-# MAGIC SELECT 
-# MAGIC   root_claim_id,
-# MAGIC   COUNT(DISTINCT claim_id) as network_size,
-# MAGIC   SUM(claim_amount) as total_network_amount,
-# MAGIC   SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) as fraud_count,
-# MAGIC   MAX(depth) as max_depth,
-# MAGIC   COLLECT_SET(claim_id) as network_claims
-# MAGIC FROM fraud_network
-# MAGIC GROUP BY root_claim_id
-# MAGIC HAVING network_size > 1
-# MAGIC ORDER BY network_size DESC, total_network_amount DESC
+# MAGIC LIMIT 20;
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC **Option B: Using Stored Procedure with On-Demand Relationships**
+# MAGIC 
+# MAGIC If you skipped relationship generation, use this version that computes relationships on-demand:
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Use stored procedure with on-demand relationship computation
+# MAGIC -- No pre-generated relationships table needed
+# MAGIC CALL ${catalog}.${schema}.discover_fraud_networks_ondemand(
+# MAGIC   max_depth => 5,
+# MAGIC   min_network_size => 2
+# MAGIC )
 # MAGIC LIMIT 20;
 
 # COMMAND ----------
