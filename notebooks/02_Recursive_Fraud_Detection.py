@@ -115,7 +115,6 @@ BEGIN
       c.is_fraud,
       c.claim_type,
       c.claim_date,
-      c.adjuster_id,
       0 as depth,
       CAST(c.claim_id AS STRING) as path
     FROM {catalog}.{schema}.claims c
@@ -123,8 +122,9 @@ BEGIN
     
     UNION ALL
     
-    -- Recursive case: Find connected claims through multiple relationship types
+    -- Recursive case: Find connected claims through policyholder connections
     -- This is where the recursion happens - we keep expanding the network
+    -- Optimized: Uses only direct policyholder connections for best performance
     SELECT DISTINCT
       c2.claim_id,
       c2.policyholder_id,
@@ -132,28 +132,20 @@ BEGIN
       c2.is_fraud,
       c2.claim_type,
       c2.claim_date,
-      c2.adjuster_id,
       fn.depth + 1,
       CONCAT(fn.path, ' -> ', c2.claim_id) as path
     FROM fraud_network fn
     INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
     INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-    INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
+    -- Optimized join: Only connect policyholders with same address or phone
+    INNER JOIN {catalog}.{schema}.policyholders p2 ON (
+      (p1.address = p2.address AND p1.address IS NOT NULL) OR
+      (p1.phone = p2.phone AND p1.phone IS NOT NULL)
+    ) AND p2.policyholder_id != p1.policyholder_id
+    INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
     WHERE fn.depth < max_depth
+      AND c2.claim_id != c1.claim_id
       AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')  -- Prevent cycles
-      AND (
-        -- Connection logic: multiple relationship types to find broader networks
-        -- 1. Policyholder connections (same address or phone)
-        (p1.address = p2.address AND p1.address IS NOT NULL) OR
-        (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-        -- 2. Same adjuster (service provider connection)
-        (c1.adjuster_id = c2.adjuster_id AND ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 180) OR
-        -- 3. Temporal patterns (same type, similar time, similar amount)
-        (c1.claim_type = c2.claim_type AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 60 AND
-         ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.5)
-      )
   )
   SELECT 
     claim_id,
