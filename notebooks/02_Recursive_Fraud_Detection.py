@@ -9,6 +9,11 @@
 
 # COMMAND ----------
 
+# Import required PySpark functions
+from pyspark.sql.functions import col, count, sum, when, lit
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Step 1: Configure Parameters
 
