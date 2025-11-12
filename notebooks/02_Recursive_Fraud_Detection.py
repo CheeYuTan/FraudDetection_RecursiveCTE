@@ -477,8 +477,13 @@ if network_count > 0:
     
     # Calculate average degree (only if nodes exist)
     if G.number_of_nodes() > 0:
-        avg_degree = sum(dict(G.degree()).values()) / G.number_of_nodes()
-        print(f"  • Average degree: {avg_degree:.2f}")
+        try:
+            # Calculate average degree - total degree sum divided by number of nodes
+            total_degree = sum(degree for node, degree in G.degree())
+            avg_degree = total_degree / G.number_of_nodes()
+            print(f"  • Average degree: {avg_degree:.2f}")
+        except Exception as e:
+            print(f"  • Average degree: N/A (unable to calculate)")
     else:
         print(f"  • Average degree: N/A (no nodes)")
     
