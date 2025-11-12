@@ -116,14 +116,15 @@ END
 
 # COMMAND ----------
 
-# Stored Procedure 2: Discover Fraud Networks (On-Demand Relationships)
+# Stored Procedure 2: Discover Fraud Network for Specific Claim
 spark.sql(f"""
-CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks(
-  max_depth INT DEFAULT 5,
-  min_network_size INT DEFAULT 2
+CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network_for_claim(
+  start_claim_id STRING,
+  max_depth INT DEFAULT 5
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
+COMMENT 'Discover the fraud network starting from a specific claim ID'
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
@@ -136,7 +137,7 @@ BEGIN
       CAST(c.claim_id AS STRING) as path,
       c.claim_id as root_claim_id
     FROM {catalog}.{schema}.claims c
-    WHERE c.is_fraud = true
+    WHERE c.claim_id = start_claim_id
     
     UNION ALL
     
@@ -166,16 +167,15 @@ BEGIN
       )
   )
   SELECT 
-    root_claim_id,
-    COUNT(DISTINCT claim_id) as network_size,
-    SUM(claim_amount) as total_network_amount,
-    SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) as fraud_count,
-    MAX(depth) as max_depth,
-    COLLECT_SET(claim_id) as network_claims
+    claim_id,
+    policyholder_id,
+    claim_amount,
+    is_fraud,
+    depth,
+    path,
+    root_claim_id
   FROM fraud_network
-  GROUP BY root_claim_id
-  HAVING network_size >= min_network_size
-  ORDER BY network_size DESC, total_network_amount DESC;
+  ORDER BY depth, claim_id;
 END
 """)
 
@@ -253,15 +253,15 @@ END
 
 # COMMAND ----------
 
-# Stored Procedure 4: Discover Fraud Networks with On-Demand Relationships
-# Works without pre-generated relationships table (production approach)
+# Stored Procedure 4: Discover Fraud Network for Specific Policyholder
 spark.sql(f"""
-CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks_ondemand(
-  max_depth INT DEFAULT 5,
-  min_network_size INT DEFAULT 2
+CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network_for_policyholder(
+  target_policyholder_id STRING,
+  max_depth INT DEFAULT 5
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
+COMMENT 'Discover the fraud network starting from a specific policyholder ID'
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
@@ -272,9 +272,9 @@ BEGIN
       c.is_fraud,
       0 as depth,
       CAST(c.claim_id AS STRING) as path,
-      c.claim_id as root_claim_id
+      c.policyholder_id as root_policyholder_id
     FROM {catalog}.{schema}.claims c
-    WHERE c.is_fraud = true
+    WHERE c.policyholder_id = target_policyholder_id
     
     UNION ALL
     
@@ -285,7 +285,7 @@ BEGIN
       c2.is_fraud,
       fn.depth + 1,
       CONCAT(fn.path, ' -> ', c2.claim_id) as path,
-      fn.root_claim_id
+      fn.root_policyholder_id
     FROM fraud_network fn
     INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
     INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
@@ -304,15 +304,15 @@ BEGIN
       )
   )
   SELECT 
-    root_claim_id,
-    COUNT(DISTINCT claim_id) as network_size,
-    SUM(claim_amount) as total_network_amount,
-    SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) as fraud_count,
-    MAX(depth) as max_depth
+    claim_id,
+    policyholder_id,
+    claim_amount,
+    is_fraud,
+    depth,
+    path,
+    root_policyholder_id
   FROM fraud_network
-  GROUP BY root_claim_id
-  HAVING network_size >= min_network_size
-  ORDER BY network_size DESC, total_network_amount DESC;
+  ORDER BY depth, claim_id;
 END
 """)
 
@@ -320,53 +320,61 @@ END
 
 print("✓ Stored procedures created successfully!")
 print(f"  - {catalog}.{schema}.fraud_network_bfs")
-print(f"  - {catalog}.{schema}.discover_fraud_networks")
+print(f"  - {catalog}.{schema}.discover_fraud_network_for_claim")
 print(f"  - {catalog}.{schema}.get_claim_relationships")
-print(f"  - {catalog}.{schema}.discover_fraud_networks_ondemand")
+print(f"  - {catalog}.{schema}.discover_fraud_network_for_policyholder")
 print("\nYou can now use these stored procedures as reusable tools!")
-print("Note: All procedures use on-demand relationship computation (production approach)")
+print("Note: All procedures use on-demand relationship computation and require specific claim/policyholder IDs")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4: Recursive CTE to Find Fraud Networks
+# MAGIC ## Step 4: Discover Fraud Network for Specific Claims
 # MAGIC 
-# MAGIC This recursive query finds all claims connected through relationships, building fraud networks.
-# MAGIC 
-# MAGIC **Option A: Using Stored Procedure (Recommended)**
-# MAGIC 
-# MAGIC Use the stored procedure for cleaner, reusable code:
+# MAGIC Use stored procedures to discover fraud networks starting from specific claims or policyholders.
+# MAGIC This approach is more practical for production use and avoids recursion limits.
 
 # COMMAND ----------
 
-# Use stored procedure to discover fraud networks
-# Uses on-demand relationship computation
+# First, get a sample claim to explore
+sample_claim = spark.sql(f"""
+SELECT claim_id, policyholder_id, is_fraud, claim_amount
+FROM {catalog}.{schema}.claims 
+WHERE is_fraud = true 
+LIMIT 1
+""").collect()
+
+if sample_claim:
+    sample_claim_id = sample_claim[0]['claim_id']
+    sample_policyholder_id = sample_claim[0]['policyholder_id']
+    print(f"Sample fraudulent claim: {sample_claim_id}")
+    print(f"Sample policyholder: {sample_policyholder_id}")
+else:
+    sample_claim_id = 'CLM00000001'
+    sample_policyholder_id = 'PH000001'
+    print(f"No fraudulent claims found, using examples")
+
+# COMMAND ----------
+
+# Discover fraud network starting from a specific claim
 result_df = spark.sql(f"""
-CALL {catalog}.{schema}.discover_fraud_networks(
-  max_depth => 5,
-  min_network_size => 2
+CALL {catalog}.{schema}.discover_fraud_network_for_claim(
+  start_claim_id => '{sample_claim_id}',
+  max_depth => 5
 )
 """)
-result_df.show(20, truncate=False)
+result_df.show(50, truncate=False)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC **Option B: Using Stored Procedure with On-Demand Relationships (Same as Option A)**
-# MAGIC 
-# MAGIC Both stored procedures now use on-demand relationship computation:
-
-# COMMAND ----------
-
-# Use stored procedure with on-demand relationship computation
-# No pre-generated relationships table needed
+# Discover fraud network starting from a specific policyholder
 result_df = spark.sql(f"""
-CALL {catalog}.{schema}.discover_fraud_networks_ondemand(
-  max_depth => 5,
-  min_network_size => 2
+CALL {catalog}.{schema}.discover_fraud_network_for_policyholder(
+  target_policyholder_id => '{sample_policyholder_id}',
+  max_depth => 5
 )
 """)
-result_df.show(20, truncate=False)
+result_df.show(50, truncate=False)
 
 # COMMAND ----------
 
