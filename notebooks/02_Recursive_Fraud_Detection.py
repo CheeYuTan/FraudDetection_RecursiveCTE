@@ -116,55 +116,50 @@ END
 
 # COMMAND ----------
 
-# Stored Procedure 2: Discover Fraud Network for Specific Claim
+# Stored Procedure 2: Discover Fraud Network for Specific Claim (Optimized)
 spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network_for_claim(
   start_claim_id STRING,
-  max_depth INT DEFAULT 5
+  max_depth INT DEFAULT 3
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
-COMMENT 'Discover the fraud network starting from a specific claim ID'
+COMMENT 'Discover the fraud network starting from a specific claim ID (optimized for performance)'
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
+    -- Base case: Start from the given claim
     SELECT 
       c.claim_id,
       c.policyholder_id,
       c.claim_amount,
       c.is_fraud,
       0 as depth,
-      CAST(c.claim_id AS STRING) as path,
-      c.claim_id as root_claim_id
+      CAST(c.claim_id AS STRING) as path
     FROM {catalog}.{schema}.claims c
     WHERE c.claim_id = start_claim_id
     
     UNION ALL
     
-    SELECT 
+    -- Recursive case: Find connected claims (optimized with direct joins)
+    SELECT DISTINCT
       c2.claim_id,
       c2.policyholder_id,
       c2.claim_amount,
       c2.is_fraud,
       fn.depth + 1,
-      CONCAT(fn.path, ' -> ', c2.claim_id) as path,
-      fn.root_claim_id
+      CONCAT(fn.path, ' -> ', c2.claim_id) as path
     FROM fraud_network fn
     INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
     INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-    INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
+    INNER JOIN {catalog}.{schema}.policyholders p2 ON (
+      (p1.address = p2.address AND p1.address IS NOT NULL) OR
+      (p1.phone = p2.phone AND p1.phone IS NOT NULL)
+    )
+    INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
     WHERE fn.depth < max_depth
+      AND c2.claim_id != c1.claim_id
       AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')
-      AND (
-        (p1.address = p2.address AND p1.address IS NOT NULL) OR
-        (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-        (c1.claim_type = c2.claim_type AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30 AND
-         ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.3) OR
-        (c1.adjuster_id = c2.adjuster_id AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
-      )
   )
   SELECT 
     claim_id,
@@ -172,10 +167,10 @@ BEGIN
     claim_amount,
     is_fraud,
     depth,
-    path,
-    root_claim_id
+    path
   FROM fraud_network
-  ORDER BY depth, claim_id;
+  ORDER BY depth, claim_id
+  LIMIT 1000;
 END
 """)
 
@@ -253,55 +248,50 @@ END
 
 # COMMAND ----------
 
-# Stored Procedure 4: Discover Fraud Network for Specific Policyholder
+# Stored Procedure 4: Discover Fraud Network for Specific Policyholder (Optimized)
 spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network_for_policyholder(
   target_policyholder_id STRING,
-  max_depth INT DEFAULT 5
+  max_depth INT DEFAULT 3
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
-COMMENT 'Discover the fraud network starting from a specific policyholder ID'
+COMMENT 'Discover the fraud network starting from a specific policyholder ID (optimized for performance)'
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
+    -- Base case: Start from all claims of the given policyholder
     SELECT 
       c.claim_id,
       c.policyholder_id,
       c.claim_amount,
       c.is_fraud,
       0 as depth,
-      CAST(c.claim_id AS STRING) as path,
-      c.policyholder_id as root_policyholder_id
+      CAST(c.claim_id AS STRING) as path
     FROM {catalog}.{schema}.claims c
     WHERE c.policyholder_id = target_policyholder_id
     
     UNION ALL
     
-    SELECT 
+    -- Recursive case: Find connected claims via shared policyholders (optimized)
+    SELECT DISTINCT
       c2.claim_id,
       c2.policyholder_id,
       c2.claim_amount,
       c2.is_fraud,
       fn.depth + 1,
-      CONCAT(fn.path, ' -> ', c2.claim_id) as path,
-      fn.root_policyholder_id
+      CONCAT(fn.path, ' -> ', c2.claim_id) as path
     FROM fraud_network fn
     INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
     INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-    INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
+    INNER JOIN {catalog}.{schema}.policyholders p2 ON (
+      (p1.address = p2.address AND p1.address IS NOT NULL) OR
+      (p1.phone = p2.phone AND p1.phone IS NOT NULL)
+    )
+    INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
     WHERE fn.depth < max_depth
+      AND c2.claim_id != c1.claim_id
       AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')
-      AND (
-        (p1.address = p2.address AND p1.address IS NOT NULL) OR
-        (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-        (c1.claim_type = c2.claim_type AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30 AND
-         ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.3) OR
-        (c1.adjuster_id = c2.adjuster_id AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
-      )
   )
   SELECT 
     claim_id,
@@ -309,10 +299,10 @@ BEGIN
     claim_amount,
     is_fraud,
     depth,
-    path,
-    root_policyholder_id
+    path
   FROM fraud_network
-  ORDER BY depth, claim_id;
+  ORDER BY depth, claim_id
+  LIMIT 1000;
 END
 """)
 
@@ -357,23 +347,27 @@ else:
 # COMMAND ----------
 
 # Discover fraud network starting from a specific claim
+# Note: Using max_depth=3 for better performance (can be increased if needed)
 result_df = spark.sql(f"""
 CALL {catalog}.{schema}.discover_fraud_network_for_claim(
   start_claim_id => '{sample_claim_id}',
-  max_depth => 5
+  max_depth => 3
 )
 """)
+print(f"Found {result_df.count()} claims in the fraud network")
 result_df.show(50, truncate=False)
 
 # COMMAND ----------
 
 # Discover fraud network starting from a specific policyholder
+# Note: Using max_depth=3 for better performance (can be increased if needed)
 result_df = spark.sql(f"""
 CALL {catalog}.{schema}.discover_fraud_network_for_policyholder(
   target_policyholder_id => '{sample_policyholder_id}',
-  max_depth => 5
+  max_depth => 3
 )
 """)
+print(f"Found {result_df.count()} claims in the fraud network")
 result_df.show(50, truncate=False)
 
 # COMMAND ----------
