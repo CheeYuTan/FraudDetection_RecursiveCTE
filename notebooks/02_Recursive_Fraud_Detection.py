@@ -495,204 +495,167 @@ else:
 # COMMAND ----------
 
 if network_count > 0:
-    print("🎨 Creating multi-entity network graph...\n")
+    print("🎨 Creating interactive multi-entity network graph...\n")
     
     # Get policyholder and adjuster information for the network
     network_with_details = network_df.toPandas()
-    
-    # Create a multi-partite graph
-    G_multi = nx.Graph()
     
     # Track entity types for coloring
     claim_nodes = set()
     policyholder_nodes = set()
     adjuster_nodes = set()
     
-    # Get unique policyholders and adjusters in the network
-    policyholders_in_network = network_with_details['policyholder_id'].unique()
-    
     # Get adjuster information
     adjusters_df = spark.sql(f"""
-        SELECT DISTINCT c.adjuster_id, a.name as adjuster_name, a.department
+        SELECT DISTINCT c.claim_id, c.adjuster_id, a.name as adjuster_name, a.department
         FROM {catalog}.{schema}.claims c
         INNER JOIN {catalog}.{schema}.adjusters a ON c.adjuster_id = a.adjuster_id
         WHERE c.claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
     """).toPandas()
     
+    # Create PyVis network
+    net_multi = Network(height='900px', width='100%', bgcolor='#1a1a1a', font_color='white')
+    
+    # Configure physics for multi-entity graph
+    net_multi.set_options("""
+    {
+      "physics": {
+        "forceAtlas2Based": {
+          "gravitationalConstant": -80,
+          "centralGravity": 0.015,
+          "springLength": 250,
+          "springConstant": 0.05,
+          "damping": 0.4
+        },
+        "maxVelocity": 40,
+        "solver": "forceAtlas2Based",
+        "timestep": 0.4,
+        "stabilization": {"iterations": 200}
+      },
+      "nodes": {
+        "font": {"size": 14, "color": "white", "face": "arial"}
+      },
+      "edges": {
+        "smooth": {"type": "continuous"}
+      }
+    }
+    """)
+    
     # Add claim nodes
     for idx, row in network_with_details.iterrows():
         claim_id = row['claim_id']
-        G_multi.add_node(claim_id, 
-                        node_type='claim',
-                        amount=row['claim_amount'],
-                        is_fraud=row['is_fraud'],
-                        claim_type=row['claim_type'])
+        is_fraud = row['is_fraud']
+        amount = row['claim_amount']
+        claim_type = row['claim_type']
+        
+        color = '#ff4444' if is_fraud else '#4477ff'
+        size = max(20, min(60, amount / 800))
+        
+        title = f"""
+        <b>🎫 CLAIM</b><br>
+        <b>ID:</b> {claim_id}<br>
+        <b>Type:</b> {claim_type}<br>
+        <b>Amount:</b> ${amount:,.2f}<br>
+        <b>Status:</b> {'🚨 FRAUD' if is_fraud else '✅ Legitimate'}
+        """
+        
+        net_multi.add_node(
+            claim_id,
+            label=claim_id[:8],
+            color=color,
+            size=size,
+            title=title,
+            shape='dot',
+            borderWidth=3
+        )
         claim_nodes.add(claim_id)
         
         # Add policyholder node
         ph_id = row['policyholder_id']
-        if ph_id not in G_multi:
-            G_multi.add_node(ph_id, node_type='policyholder')
+        if ph_id not in policyholder_nodes:
+            ph_title = f"""
+            <b>👤 POLICYHOLDER</b><br>
+            <b>ID:</b> {ph_id}
+            """
+            net_multi.add_node(
+                ph_id,
+                label=f"PH-{ph_id[-4:]}",
+                color='#ff9933',
+                size=35,
+                title=ph_title,
+                shape='square',
+                borderWidth=3
+            )
             policyholder_nodes.add(ph_id)
         
         # Connect claim to policyholder
-        G_multi.add_edge(claim_id, ph_id, edge_type='filed_by')
+        net_multi.add_edge(ph_id, claim_id, color='#999999', width=2.5, dashes=False)
     
     # Add adjuster nodes and connections
     for idx, row in adjusters_df.iterrows():
         adj_id = row['adjuster_id']
-        if adj_id not in G_multi:
-            G_multi.add_node(adj_id, 
-                           node_type='adjuster',
-                           department=row['department'])
+        claim_id = row['claim_id']
+        
+        if adj_id not in adjuster_nodes:
+            adj_title = f"""
+            <b>🏥 SERVICE PROVIDER</b><br>
+            <b>ID:</b> {adj_id}<br>
+            <b>Name:</b> {row['adjuster_name']}<br>
+            <b>Dept:</b> {row['department']}
+            """
+            net_multi.add_node(
+                adj_id,
+                label=f"ADJ-{adj_id[-3:]}",
+                color='#44dd44',
+                size=45,
+                title=adj_title,
+                shape='triangle',
+                borderWidth=3
+            )
             adjuster_nodes.add(adj_id)
         
-        # Connect adjusters to their claims
-        adj_claims = network_with_details[network_with_details['claim_id'].isin(
-            spark.sql(f"""
-                SELECT claim_id 
-                FROM {catalog}.{schema}.claims 
-                WHERE adjuster_id = '{adj_id}'
-                AND claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
-            """).toPandas()['claim_id'].tolist() if spark.sql(f"""
-                SELECT claim_id 
-                FROM {catalog}.{schema}.claims 
-                WHERE adjuster_id = '{adj_id}'
-                AND claim_id IN ({','.join([f"'{cid}'" for cid in network_with_details['claim_id'].tolist()])})
-            """).count() > 0 else []
-        )]
-        
-        for claim_id in adj_claims['claim_id']:
-            G_multi.add_edge(adj_id, claim_id, edge_type='processed_by')
+        # Connect adjuster to claim
+        net_multi.add_edge(adj_id, claim_id, color='#44dd44', width=2, dashes=True)
     
-    # Create visualization with different layouts
-    plt.figure(figsize=(20, 16))
+    # Generate and display the network
+    html_file_multi = tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w')
+    net_multi.save_graph(html_file_multi.name)
+    html_file_multi.close()
     
-    # Use spring layout for better visualization
-    pos = nx.spring_layout(G_multi, k=3, iterations=100, seed=42)
+    # Display in notebook
+    with open(html_file_multi.name, 'r') as f:
+        html_content_multi = f.read()
     
-    # Prepare node colors and sizes by type
-    node_colors = []
-    node_sizes = []
-    node_shapes = []
+    displayHTML(html_content_multi)
     
-    for node in G_multi.nodes():
-        node_data = G_multi.nodes[node]
-        
-        if node_data['node_type'] == 'claim':
-            # Claims: Red for fraud, Blue for legitimate
-            if node_data['is_fraud']:
-                node_colors.append('#ff4444')  # Red
-            else:
-                node_colors.append('#4477ff')  # Blue
-            # Size based on claim amount
-            node_sizes.append(max(500, min(4000, node_data['amount'] / 50)))
-        elif node_data['node_type'] == 'policyholder':
-            # Policyholders: Orange
-            node_colors.append('#ff9933')
-            node_sizes.append(800)
-        else:  # adjuster
-            # Adjusters: Green
-            node_colors.append('#44dd44')
-            node_sizes.append(1200)
+    print("\n✨ Interactive Multi-Entity Graph Features:")
+    print(f"  • 🖱️  Drag any node to rearrange the ecosystem")
+    print(f"  • 🔍 Zoom to explore dense clusters")
+    print(f"  • 👆 Hover for detailed entity information")
+    print(f"  • 🎯 Watch how entities naturally cluster together")
+    print(f"  • ⚡ Beautiful physics-based layout!")
     
-    # Draw nodes
-    nx.draw_networkx_nodes(
-        G_multi, pos,
-        node_color=node_colors,
-        node_size=node_sizes,
-        alpha=0.85,
-        edgecolors='black',
-        linewidths=2.5
-    )
+    print(f"\n📊 Entity Types:")
+    print(f"  • 🔴 Red circles = Fraudulent claims")
+    print(f"  • 🔵 Blue circles = Legitimate claims")
+    print(f"  • 🟠 Orange squares = Policyholders")
+    print(f"  • 🟢 Green triangles = Adjusters/Service Providers")
     
-    # Draw edges with different styles
-    claim_ph_edges = [(u, v) for u, v, d in G_multi.edges(data=True) if d.get('edge_type') == 'filed_by']
-    claim_adj_edges = [(u, v) for u, v, d in G_multi.edges(data=True) if d.get('edge_type') == 'processed_by']
-    other_edges = [(u, v) for u, v, d in G_multi.edges(data=True) if 'edge_type' not in d]
+    print(f"\n🔗 Relationship Types:")
+    print(f"  • Solid gray lines = Filed by (policyholder → claim)")
+    print(f"  • Dashed green lines = Processed by (adjuster → claim)")
     
-    # Claim to policyholder edges (solid)
-    nx.draw_networkx_edges(
-        G_multi, pos,
-        edgelist=claim_ph_edges,
-        edge_color='#666666',
-        width=2,
-        alpha=0.6,
-        style='solid'
-    )
+    print(f"\n📈 Network Composition:")
+    print(f"  • Claims: {len(claim_nodes)}")
+    print(f"  • Policyholders: {len(policyholder_nodes)}")
+    print(f"  • Adjusters/Providers: {len(adjuster_nodes)}")
+    print(f"  • Total entities: {len(claim_nodes) + len(policyholder_nodes) + len(adjuster_nodes)}")
     
-    # Claim to adjuster edges (dashed)
-    nx.draw_networkx_edges(
-        G_multi, pos,
-        edgelist=claim_adj_edges,
-        edge_color='#44dd44',
-        width=2,
-        alpha=0.5,
-        style='dashed'
-    )
-    
-    # Other edges (fraud network connections)
-    nx.draw_networkx_edges(
-        G_multi, pos,
-        edgelist=other_edges,
-        edge_color='#999999',
-        width=1,
-        alpha=0.3
-    )
-    
-    # Add labels
-    labels = {}
-    for node in G_multi.nodes():
-        node_data = G_multi.nodes[node]
-        if node_data['node_type'] == 'claim':
-            labels[node] = node[:10]  # Shortened claim ID
-        elif node_data['node_type'] == 'policyholder':
-            labels[node] = f"PH\n{node[-4:]}"  # Last 4 digits
-        else:  # adjuster
-            labels[node] = f"ADJ\n{node[-3:]}"  # Last 3 digits
-    
-    nx.draw_networkx_labels(
-        G_multi, pos,
-        labels,
-        font_size=7,
-        font_weight='bold',
-        font_color='white'
-    )
-    
-    # Add legend
-    from matplotlib.patches import Patch
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Patch(facecolor='#ff4444', edgecolor='black', label='Fraudulent Claim'),
-        Patch(facecolor='#4477ff', edgecolor='black', label='Legitimate Claim'),
-        Patch(facecolor='#ff9933', edgecolor='black', label='Policyholder'),
-        Patch(facecolor='#44dd44', edgecolor='black', label='Adjuster/Service Provider'),
-        Line2D([0], [0], color='#666666', linewidth=2, label='Filed By'),
-        Line2D([0], [0], color='#44dd44', linewidth=2, linestyle='--', label='Processed By')
-    ]
-    plt.legend(handles=legend_elements, loc='upper right', fontsize=12, framealpha=0.95)
-    
-    plt.title(f"Multi-Entity Fraud Network - Starting from Claim {target_claim_id}\n"
-              f"Claims: {len(claim_nodes)} | Policyholders: {len(policyholder_nodes)} | Adjusters: {len(adjuster_nodes)}",
-              fontsize=18, fontweight='bold', pad=20)
-    plt.axis('off')
-    plt.tight_layout()
-    
-    # Display the graph
-    display(plt.show())
-    
-    print("\n📊 Multi-Entity Graph Interpretation:")
-    print(f"  • Red circles = Fraudulent claims")
-    print(f"  • Blue circles = Legitimate claims")
-    print(f"  • Orange circles = Policyholders who filed the claims")
-    print(f"  • Green circles = Adjusters/Service providers who processed claims")
-    print(f"  • Solid lines = 'Filed by' relationships (claim → policyholder)")
-    print(f"  • Dashed green lines = 'Processed by' relationships (claim → adjuster)")
-    print(f"  • Circle size = Claim amount (for claim nodes)")
-    print(f"\n💡 This shows the full fraud ecosystem:")
-    print(f"  • How multiple claims connect through shared policyholders")
-    print(f"  • Which adjusters handled suspicious claims")
-    print(f"  • Potential coordination between entities")
+    print(f"\n💡 What to Look For:")
+    print(f"  • Clusters of red (fraud) nodes = potential fraud rings")
+    print(f"  • Policyholders connected to many claims = suspicious activity")
+    print(f"  • Adjusters linked to multiple fraud claims = investigation needed")
+    print(f"  • Dense connections = coordinated fraud patterns")
     
 else:
     print("⚠️  No network to visualize - claim appears to be isolated")
