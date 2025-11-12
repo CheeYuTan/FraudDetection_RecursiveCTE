@@ -2,16 +2,7 @@
 
 Get up and running with the Fraud Detection Demo in 5 minutes!
 
-## Step 1: Generate Dataset in Databricks (2 minutes)
-
-1. Import notebook `01_Dataset_Generation.py` into Databricks
-2. Configure widgets:
-   - Catalog: `main` (or your catalog)
-   - Schema: `fraud_detection_demo` (or your schema)
-   - Adjust other parameters as needed
-3. Run the notebook - data is generated directly in Delta tables!
-
-## Step 2: Clone Repository in Databricks (1 minute)
+## Step 1: Clone Repository in Databricks (1 minute)
 
 1. In Databricks workspace, go to **Workspace**
 2. Click dropdown next to your username → **Git** → **Clone Repository**
@@ -21,11 +12,19 @@ Get up and running with the Fraud Detection Demo in 5 minutes!
 
 This clones all notebooks automatically!
 
-## Step 3: Run Notebooks (1 minute)
+## Step 2: Generate Dataset (2 minutes)
 
-1. **01_Dataset_Generation.py** - Generate dataset (configure widgets first!)
-2. **02_Recursive_Fraud_Detection.py** - Detect fraud networks (configure widgets!)
-3. **03_Fraud_Analysis_Visualization.py** - Show analysis (configure widgets!)
+1. Open `notebooks/01_Dataset_Generation.py` from the cloned repository
+2. Configure widgets:
+   - Catalog: `main` (or your catalog)
+   - Schema: `fraud_detection_demo` (or your schema)
+   - Adjust other parameters as needed
+3. Run the notebook - data is generated directly in Delta tables!
+
+## Step 3: Run Fraud Detection Analysis (1 minute)
+
+1. **notebooks/02_Recursive_Fraud_Detection.py** - Detect fraud networks (configure widgets!)
+2. **notebooks/03_Fraud_Analysis_Visualization.py** - Show analysis (configure widgets!)
 
 **Important:** Configure the catalog and schema widgets in each notebook to match your setup!
 

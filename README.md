@@ -47,7 +47,7 @@ This will clone the entire repository into your workspace, including all 3 noteb
 
 ### Step 2: Generate Dataset
 
-1. Open the `01_Dataset_Generation.py` notebook
+1. Open the `notebooks/01_Dataset_Generation.py` notebook from the cloned repository
 2. Configure the widgets at the top of the notebook:
    - **Catalog**: Your catalog name (default: `main`)
    - **Schema**: Your schema/database name (default: `fraud_detection_demo`)
@@ -62,9 +62,9 @@ This will clone the entire repository into your workspace, including all 3 noteb
 
 ### Step 3: Run Fraud Detection Analysis
 
-1. **02_Recursive_Fraud_Detection.py**: Runs recursive queries to detect fraud networks
+1. **notebooks/02_Recursive_Fraud_Detection.py**: Runs recursive queries to detect fraud networks
    - Configure widgets: Catalog and Schema (must match Step 2)
-2. **03_Fraud_Analysis_Visualization.py**: Provides analysis and visualizations
+2. **notebooks/03_Fraud_Analysis_Visualization.py**: Provides analysis and visualizations
    - Configure widgets: Catalog and Schema (must match Step 2)
 
 **Important:** All notebooks use widgets for catalog and schema configuration. Make sure to set the same catalog and schema values across all notebooks!
