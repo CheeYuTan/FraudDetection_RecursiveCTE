@@ -253,9 +253,12 @@ if use_batch_processing:
     
     print(f"  Processing batch 1/{num_batches} ({batch_size_actual:,} claims)...")
     
-    # Always drop table first to ensure clean schema (prevent merge conflicts)
-    spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.claims")
-    print(f"✓ Cleared existing claims table for clean write")
+    # Always drop table first to ensure completely clean schema (prevent any merge conflicts)
+    try:
+        spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.claims")
+        print(f"✓ Dropped existing claims table for clean write")
+    except:
+        print(f"✓ No existing claims table to drop")
     
     # Generate claims using join with indexed policyholders (efficient random selection)
     claims_batch_df = spark.range(batch_start, batch_end).select(
@@ -268,15 +271,15 @@ if use_batch_processing:
     ).select(
         format_string("CLM%08d", col("claim_num")).alias("claim_id"),
         col("policyholder_id"),
-        element_at(array([lit(ct) for ct in claim_types]), 
+        element_at(array([lit(ct) for ct in claim_types]),
                    (rand() * len(claim_types) + 1).cast("int")).alias("claim_type"),
         expr(f"date_sub(current_date(), cast(rand() * 729 + 1 as int))").alias("claim_date"),
         expr(f"date_sub(current_date(), cast(rand() * 60 + 1 as int))").alias("incident_date"),
-        when(expr("rand() < 0.5"), 
+        when(expr("rand() < 0.5"),
              least(expr("exp(9 + rand() * 1.5)"), lit(500000)))
         .otherwise(least(expr("exp(7 + rand() * 1.2)"), lit(100000)))
         .cast("double").alias("claim_amount"),
-        element_at(array([lit(cs) for cs in claim_statuses]), 
+        element_at(array([lit(cs) for cs in claim_statuses]),
                    (rand() * len(claim_statuses) + 1).cast("int")).alias("claim_status"),
         concat(lit("Claim description for "),
                element_at(array([lit(ct) for ct in claim_types]),
@@ -287,9 +290,8 @@ if use_batch_processing:
         (rand() * 89 + 1).cast("int").alias("processing_days")
     )
     
-    # Write first batch to create table
-    write_mode = "overwrite" if overwrite_mode else "errorifexists"
-    claims_batch_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.claims")
+    # Write first batch to create table (always use overwrite since we dropped the table)
+    claims_batch_df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.claims")
     
     # Process remaining batches and append
     for batch_num in range(1, num_batches):
@@ -476,19 +478,21 @@ if overwrite_mode:
 
 write_mode = "overwrite" if overwrite_mode else "append"
 
-# Write policyholders with schema merge support
-policyholders_df.write.mode(write_mode).option("mergeSchema", "true").saveAsTable(f"{catalog}.{schema}.policyholders")
+# Write policyholders
+policyholders_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.policyholders")
 print(f"✓ Written to {catalog}.{schema}.policyholders")
 
 # Write claims (already handled in batch processing for large datasets)
 if not use_batch_processing:
-    claims_df.write.mode(write_mode).option("mergeSchema", "true").saveAsTable(f"{catalog}.{schema}.claims")
+    # Drop first to ensure clean schema
+    spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.claims")
+    claims_df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.claims")
     print(f"✓ Written to {catalog}.{schema}.claims")
 else:
     print(f"✓ Claims already written via batch processing to {catalog}.{schema}.claims")
 
-# Write adjusters with schema merge support
-adjusters_df.write.mode(write_mode).option("mergeSchema", "true").saveAsTable(f"{catalog}.{schema}.adjusters")
+# Write adjusters
+adjusters_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.adjusters")
 print(f"✓ Written to {catalog}.{schema}.adjusters")
 
 # COMMAND ----------
