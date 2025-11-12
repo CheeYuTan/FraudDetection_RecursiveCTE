@@ -461,8 +461,26 @@ if network_count > 0:
     print(f"\n🔍 Network Metrics:")
     print(f"  • Total nodes (claims): {G.number_of_nodes()}")
     print(f"  • Total edges (connections): {G.number_of_edges()}")
-    print(f"  • Network diameter: {nx.diameter(G.to_undirected()) if nx.is_connected(G.to_undirected()) else 'N/A (disconnected)'}")
-    print(f"  • Average degree: {sum(dict(G.degree()).values()) / G.number_of_nodes():.2f}")
+    
+    # Calculate network diameter (only if connected)
+    if G.number_of_nodes() > 1:
+        try:
+            if nx.is_connected(G.to_undirected()):
+                diameter = nx.diameter(G.to_undirected())
+                print(f"  • Network diameter: {diameter}")
+            else:
+                print(f"  • Network diameter: N/A (disconnected components)")
+        except:
+            print(f"  • Network diameter: N/A (unable to calculate)")
+    else:
+        print(f"  • Network diameter: N/A (single node)")
+    
+    # Calculate average degree (only if nodes exist)
+    if G.number_of_nodes() > 0:
+        avg_degree = sum(dict(G.degree()).values()) / G.number_of_nodes()
+        print(f"  • Average degree: {avg_degree:.2f}")
+    else:
+        print(f"  • Average degree: N/A (no nodes)")
     
 else:
     print("⚠️  No network to visualize - claim appears to be isolated")
