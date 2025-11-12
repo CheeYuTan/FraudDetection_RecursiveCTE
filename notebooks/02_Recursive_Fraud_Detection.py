@@ -12,6 +12,11 @@
 # Import required PySpark functions
 from pyspark.sql.functions import col, count, sum, when, lit
 
+# Import visualization libraries
+import networkx as nx
+import matplotlib.pyplot as plt
+import pandas as pd
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -312,11 +317,12 @@ network_count = network_df.count()
 print(f"✓ Found {network_count} claims in the fraud network")
 
 if network_count > 0:
-    # Show the network
-    network_df.show(50, truncate=False)
+    # Show sample of the network data
+    print("Sample of discovered network:")
+    network_df.show(20, truncate=False)
     
     # Network statistics
-    print("\n📈 Network Statistics:")
+    print("\n📈 Network Statistics by Depth:")
     network_stats = network_df.groupBy("depth").agg(
         count("*").alias("claim_count"),
         sum("claim_amount").alias("total_amount"),
@@ -331,6 +337,123 @@ if network_count > 0:
     print(f"🚨 Fraudulent Claims in Network: {total_fraud}/{network_count} ({total_fraud/network_count*100:.1f}%)")
 else:
     print("This claim appears to be isolated (no network connections found)")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Step 4d: Visualize the Fraud Network Graph
+# MAGIC 
+# MAGIC Now let's visualize the network as an actual graph to see how claims are connected through the recursive traversal!
+
+# COMMAND ----------
+
+if network_count > 0:
+    print("🎨 Creating network graph visualization...\n")
+    
+    # Convert to pandas for easier manipulation
+    network_pd = network_df.toPandas()
+    
+    # Create a directed graph
+    G = nx.DiGraph()
+    
+    # Add nodes with attributes
+    for idx, row in network_pd.iterrows():
+        G.add_node(
+            row['claim_id'],
+            amount=row['claim_amount'],
+            is_fraud=row['is_fraud'],
+            depth=row['depth'],
+            claim_type=row['claim_type'],
+            policyholder=row['policyholder_id']
+        )
+    
+    # Add edges by parsing the path
+    for idx, row in network_pd.iterrows():
+        path_parts = row['path'].split(' -> ')
+        for i in range(len(path_parts) - 1):
+            G.add_edge(path_parts[i], path_parts[i + 1])
+    
+    # Create visualization
+    plt.figure(figsize=(16, 12))
+    
+    # Use spring layout for better visualization
+    pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+    
+    # Prepare node colors and sizes
+    node_colors = []
+    node_sizes = []
+    for node in G.nodes():
+        # Color: red for fraud, lightblue for legitimate
+        if G.nodes[node]['is_fraud']:
+            node_colors.append('#ff4444')  # Red for fraud
+        else:
+            node_colors.append('#4477ff')  # Blue for legitimate
+        
+        # Size based on claim amount (scaled)
+        amount = G.nodes[node]['amount']
+        node_sizes.append(max(300, min(3000, amount / 100)))  # Scale to reasonable size
+    
+    # Draw the network
+    nx.draw_networkx_nodes(
+        G, pos,
+        node_color=node_colors,
+        node_size=node_sizes,
+        alpha=0.8,
+        edgecolors='black',
+        linewidths=2
+    )
+    
+    nx.draw_networkx_edges(
+        G, pos,
+        edge_color='gray',
+        arrows=True,
+        arrowsize=15,
+        arrowstyle='->',
+        width=1.5,
+        alpha=0.5,
+        connectionstyle='arc3,rad=0.1'
+    )
+    
+    nx.draw_networkx_labels(
+        G, pos,
+        font_size=8,
+        font_weight='bold',
+        font_color='white'
+    )
+    
+    # Add legend
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='#ff4444', edgecolor='black', label='Fraudulent Claim'),
+        Patch(facecolor='#4477ff', edgecolor='black', label='Legitimate Claim')
+    ]
+    plt.legend(handles=legend_elements, loc='upper right', fontsize=12)
+    
+    plt.title(f"Fraud Network Graph - Starting from Claim {target_claim_id}\n"
+              f"Total Claims: {network_count} | Fraudulent: {total_fraud} ({total_fraud/network_count*100:.1f}%)",
+              fontsize=16, fontweight='bold', pad=20)
+    plt.axis('off')
+    plt.tight_layout()
+    
+    # Display the graph
+    display(plt.show())
+    
+    print("\n📊 Graph Interpretation:")
+    print(f"  • Red nodes = Fraudulent claims")
+    print(f"  • Blue nodes = Legitimate claims")
+    print(f"  • Node size = Claim amount (larger = higher value)")
+    print(f"  • Arrows = Connection discovered through recursion")
+    print(f"  • Starting claim: {target_claim_id}")
+    
+    # Print some interesting network metrics
+    print(f"\n🔍 Network Metrics:")
+    print(f"  • Total nodes (claims): {G.number_of_nodes()}")
+    print(f"  • Total edges (connections): {G.number_of_edges()}")
+    print(f"  • Network diameter: {nx.diameter(G.to_undirected()) if nx.is_connected(G.to_undirected()) else 'N/A (disconnected)'}")
+    print(f"  • Average degree: {sum(dict(G.degree()).values()) / G.number_of_nodes():.2f}")
+    
+else:
+    print("⚠️  No network to visualize - claim appears to be isolated")
 
 # COMMAND ----------
 
