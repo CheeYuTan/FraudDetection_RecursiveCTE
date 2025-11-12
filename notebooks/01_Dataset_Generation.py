@@ -405,9 +405,8 @@ else:
 print("Generating claim relationships...")
 
 if use_batch_processing:
-    print("Using Spark-based relationship generation from data patterns...")
-    # Generate relationships based on shared attributes (like in production)
-    from pyspark.sql.functions import col, rand, lit, when, datediff, abs as spark_abs
+    print("Using Spark-based relationship generation...")
+    from pyspark.sql.functions import col, rand, lit, datediff, abs as spark_abs
     
     # Join claims with policyholders to get attributes
     claims_with_ph = claims_df.join(
@@ -417,71 +416,55 @@ if use_batch_processing:
     
     all_relationships = []
     
-    # 1. Relationships from shared addresses
-    print("  Generating relationships from shared addresses...")
-    shared_address_rels = claims_with_ph.alias("c1").join(
+    # 1. Policyholder connections: Claims from related policyholders (same address, phone, etc.)
+    print("  Generating policyholder connections...")
+    policyholder_conn_rels = claims_with_ph.alias("c1").join(
         claims_with_ph.alias("c2"),
-        (col("c1.address") == col("c2.address")) &
-        (col("c1.address").isNotNull()) &
-        (col("c1.claim_id") < col("c2.claim_id")) &
-        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 365)  # Within 1 year
+        (
+            # Same address or same phone number
+            ((col("c1.address") == col("c2.address")) & col("c1.address").isNotNull()) |
+            ((col("c1.phone") == col("c2.phone")) & col("c1.phone").isNotNull())
+        ) &
+        (col("c1.policyholder_id") != col("c2.policyholder_id")) &
+        (col("c1.claim_id") < col("c2.claim_id"))
     ).select(
         col("c1.claim_id").alias("claim_id_1"),
         col("c2.claim_id").alias("claim_id_2"),
-        lit("shared_address").alias("relationship_type"),
+        lit("policyholder_connection").alias("relationship_type"),
         (rand() * 0.2 + 0.7).alias("strength")  # 0.7 to 0.9
     )
-    all_relationships.append(shared_address_rels)
+    all_relationships.append(policyholder_conn_rels)
     
-    # 2. Relationships from shared phone numbers
-    print("  Generating relationships from shared phone numbers...")
-    shared_phone_rels = claims_with_ph.alias("c1").join(
-        claims_with_ph.alias("c2"),
-        (col("c1.phone") == col("c2.phone")) &
-        (col("c1.phone").isNotNull()) &
-        (col("c1.claim_id") < col("c2.claim_id")) &
-        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 365)
-    ).select(
-        col("c1.claim_id").alias("claim_id_1"),
-        col("c2.claim_id").alias("claim_id_2"),
-        lit("shared_phone").alias("relationship_type"),
-        (rand() * 0.2 + 0.6).alias("strength")  # 0.6 to 0.8
-    )
-    all_relationships.append(shared_phone_rels)
-    
-    # 3. Relationships from same adjuster with similar patterns
-    print("  Generating relationships from same adjuster with similar patterns...")
-    similar_pattern_rels = claims_df.alias("c1").join(
+    # 2. Temporal patterns: Claims filed within short time windows
+    print("  Generating temporal patterns...")
+    temporal_rels = claims_df.alias("c1").join(
         claims_df.alias("c2"),
-        (col("c1.adjuster_id") == col("c2.adjuster_id")) &
         (col("c1.claim_type") == col("c2.claim_type")) &
         (col("c1.claim_id") < col("c2.claim_id")) &
-        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 90) &  # Within 90 days
+        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 30) &  # Within 30 days
         (spark_abs(col("c1.claim_amount") - col("c2.claim_amount")) < col("c1.claim_amount") * 0.3)  # Similar amounts
     ).select(
         col("c1.claim_id").alias("claim_id_1"),
         col("c2.claim_id").alias("claim_id_2"),
-        lit("similar_pattern").alias("relationship_type"),
-        (rand() * 0.3 + 0.4).alias("strength")  # 0.4 to 0.7
+        lit("temporal_pattern").alias("relationship_type"),
+        (rand() * 0.3 + 0.5).alias("strength")  # 0.5 to 0.8
     )
-    all_relationships.append(similar_pattern_rels)
+    all_relationships.append(temporal_rels)
     
-    # 4. Relationships from geographic proximity
-    print("  Generating relationships from geographic proximity...")
-    geo_rels = claims_with_ph.alias("c1").join(
-        claims_with_ph.alias("c2"),
-        (col("c1.city") == col("c2.city")) &
-        (col("c1.state") == col("c2.state")) &
-        (col("c1.claim_type") == col("c2.claim_type")) &
+    # 3. Service provider connections: Same adjuster, repair shop, medical provider, etc.
+    print("  Generating service provider connections...")
+    service_provider_rels = claims_df.alias("c1").join(
+        claims_df.alias("c2"),
+        (col("c1.adjuster_id") == col("c2.adjuster_id")) &
         (col("c1.claim_id") < col("c2.claim_id")) &
-        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 180)  # Within 6 months
+        (spark_abs(datediff(col("c1.claim_date"), col("c2.claim_date"))) < 90)  # Within 90 days
     ).select(
         col("c1.claim_id").alias("claim_id_1"),
         col("c2.claim_id").alias("claim_id_2"),
-        lit("geographic_proximity").alias("relationship_type"),
-        (rand() * 0.2 + 0.3).alias("strength")  # 0.3 to 0.5
+        lit("service_provider_connection").alias("relationship_type"),
+        (rand() * 0.2 + 0.6).alias("strength")  # 0.6 to 0.8
     )
-    all_relationships.append(geo_rels)
+    all_relationships.append(service_provider_rels)
     
     # Union all relationship types
     print("  Combining all relationship types...")
@@ -500,12 +483,13 @@ if use_batch_processing:
     
     relationships_df = relationships_df.cache()
     relationships_count = relationships_df.count()
-    print(f"✓ Generated {relationships_count:,} relationships from data patterns")
+    print(f"✓ Generated {relationships_count:,} relationships")
+    print(f"  Relationship types: policyholder_connection, temporal_pattern, service_provider_connection")
     
 else:
     # Use pandas for smaller datasets
     def generate_relationships_pandas(claims_df, policyholders_df):
-        """Generate relationships between claims based on shared attributes"""
+        """Generate relationships between claims using 3 types: policyholder connections, temporal patterns, service provider connections"""
         relationships = []
         claims_pdf = claims_df.toPandas()
         policyholders_pdf = policyholders_df.toPandas()
@@ -517,7 +501,7 @@ else:
             how='left'
         )
         
-        # 1. Relationships from shared addresses
+        # 1. Policyholder connections: Claims from related policyholders (same address, phone, etc.)
         for address in claims_with_ph['address'].unique():
             if pd.isna(address):
                 continue
@@ -526,15 +510,17 @@ else:
                 claim_ids = address_claims['claim_id'].tolist()
                 for i, claim1 in enumerate(claim_ids):
                     for claim2 in claim_ids[i+1:]:
-                        if np.random.random() < 0.5:  # 50% chance
+                        # Only connect if different policyholders
+                        ph1 = address_claims[address_claims['claim_id'] == claim1]['policyholder_id'].values[0]
+                        ph2 = address_claims[address_claims['claim_id'] == claim2]['policyholder_id'].values[0]
+                        if ph1 != ph2 and np.random.random() < 0.5:  # 50% chance
                             relationships.append({
                                 'claim_id_1': claim1,
                                 'claim_id_2': claim2,
-                                'relationship_type': 'shared_address',
+                                'relationship_type': 'policyholder_connection',
                                 'strength': np.random.uniform(0.7, 0.9)
                             })
         
-        # 2. Relationships from shared phone numbers
         for phone in claims_with_ph['phone'].unique():
             if pd.isna(phone):
                 continue
@@ -543,32 +529,50 @@ else:
                 claim_ids = phone_claims['claim_id'].tolist()
                 for i, claim1 in enumerate(claim_ids):
                     for claim2 in claim_ids[i+1:]:
-                        if np.random.random() < 0.5:  # 50% chance
+                        ph1 = phone_claims[phone_claims['claim_id'] == claim1]['policyholder_id'].values[0]
+                        ph2 = phone_claims[phone_claims['claim_id'] == claim2]['policyholder_id'].values[0]
+                        if ph1 != ph2 and np.random.random() < 0.5:  # 50% chance
                             relationships.append({
                                 'claim_id_1': claim1,
                                 'claim_id_2': claim2,
-                                'relationship_type': 'shared_phone',
-                                'strength': np.random.uniform(0.6, 0.8)
+                                'relationship_type': 'policyholder_connection',
+                                'strength': np.random.uniform(0.7, 0.9)
                             })
         
-        # 3. Relationships from same adjuster with similar patterns
+        # 2. Temporal patterns: Claims filed within short time windows
+        for _, claim1 in claims_pdf.iterrows():
+            claim_date1 = pd.to_datetime(claim1['claim_date'])
+            similar = claims_pdf[
+                (claims_pdf['claim_type'] == claim1['claim_type']) &
+                (claims_pdf['claim_id'] != claim1['claim_id']) &
+                (abs((pd.to_datetime(claims_pdf['claim_date']) - claim_date1).dt.days) < 30) &
+                (abs(claims_pdf['claim_amount'] - claim1['claim_amount']) < claim1['claim_amount'] * 0.3)
+            ]
+            for _, claim2 in similar.head(2).iterrows():
+                if claim1['claim_id'] < claim2['claim_id'] and np.random.random() < 0.3:  # 30% chance
+                    relationships.append({
+                        'claim_id_1': claim1['claim_id'],
+                        'claim_id_2': claim2['claim_id'],
+                        'relationship_type': 'temporal_pattern',
+                        'strength': np.random.uniform(0.5, 0.8)
+                    })
+        
+        # 3. Service provider connections: Same adjuster, repair shop, medical provider, etc.
         for adjuster_id in claims_pdf['adjuster_id'].unique():
             adjuster_claims = claims_pdf[claims_pdf['adjuster_id'] == adjuster_id]
-            for _, claim1 in adjuster_claims.iterrows():
-                similar = adjuster_claims[
-                    (adjuster_claims['claim_type'] == claim1['claim_type']) &
-                    (adjuster_claims['claim_id'] != claim1['claim_id']) &
-                    (abs((pd.to_datetime(adjuster_claims['claim_date']) - pd.to_datetime(claim1['claim_date'])).dt.days) < 90) &
-                    (abs(adjuster_claims['claim_amount'] - claim1['claim_amount']) < claim1['claim_amount'] * 0.3)
-                ]
-                for _, claim2 in similar.head(2).iterrows():
-                    if np.random.random() < 0.3:  # 30% chance
-                        relationships.append({
-                            'claim_id_1': claim1['claim_id'],
-                            'claim_id_2': claim2['claim_id'],
-                            'relationship_type': 'similar_pattern',
-                            'strength': np.random.uniform(0.4, 0.7)
-                        })
+            for i, claim1 in adjuster_claims.iterrows():
+                for j, claim2 in adjuster_claims.iterrows():
+                    if i < j:  # Avoid duplicates
+                        claim_date1 = pd.to_datetime(claim1['claim_date'])
+                        claim_date2 = pd.to_datetime(claim2['claim_date'])
+                        if abs((claim_date2 - claim_date1).days) < 90:  # Within 90 days
+                            if np.random.random() < 0.4:  # 40% chance
+                                relationships.append({
+                                    'claim_id_1': claim1['claim_id'],
+                                    'claim_id_2': claim2['claim_id'],
+                                    'relationship_type': 'service_provider_connection',
+                                    'strength': np.random.uniform(0.6, 0.8)
+                                })
         
         # Remove duplicates
         relationships_df = pd.DataFrame(relationships)
@@ -580,7 +584,8 @@ else:
     relationships_pdf = generate_relationships_pandas(claims_df, policyholders_df)
     relationships_df = spark.createDataFrame(relationships_pdf)
     relationships_count = len(relationships_pdf) if len(relationships_pdf) > 0 else 0
-    print(f"✓ Generated {relationships_count:,} relationships from data patterns")
+    print(f"✓ Generated {relationships_count:,} relationships")
+    print(f"  Relationship types: policyholder_connection, temporal_pattern, service_provider_connection")
 
 # COMMAND ----------
 

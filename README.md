@@ -15,7 +15,6 @@ The demo includes:
 ```
 .
 ├── README.md                          # This file
-├── PRODUCTION_APPROACH.md             # Guide for adapting to real data
 ├── notebooks/                         # Databricks notebooks
 │   ├── 01_Dataset_Generation.py     # ⭐ Generate dataset directly in Databricks
 │   ├── 02_Recursive_Fraud_Detection.py  # Recursive fraud detection queries
@@ -126,18 +125,15 @@ Maximum score: 100 points
 - Claim statuses: Pending, Approved, Denied, Under Review
 - Incident dates and processing timelines
 
-### Relationships (Production Approach)
+### Relationships
 
-In a real insurance system, relationships would be **derived from actual data patterns**, not pre-labeled. Common relationship sources include:
+Relationships are derived from data patterns and fall into three categories:
 
-- **Shared attributes**: Same address, phone number, email, or adjuster
-- **Similar patterns**: Same claim type, similar dates, similar amounts
-- **Policyholder connections**: Claims from related policyholders (family members, business associates)
-- **Geographic proximity**: Claims from same location or nearby areas
-- **Temporal patterns**: Claims filed within short time windows
-- **Service provider connections**: Same repair shop, medical provider, or attorney
+1. **Policyholder connections**: Claims from related policyholders (same address, phone number, etc.)
+2. **Temporal patterns**: Claims filed within short time windows (within 30 days) with similar characteristics
+3. **Service provider connections**: Claims handled by the same service provider (adjuster, repair shop, medical provider, attorney, etc.)
 
-The recursive queries then use these relationships to discover fraud networks.
+The recursive queries use these relationships to discover fraud networks.
 
 ### Fraud Rings (Discovery-Based)
 
@@ -151,15 +147,18 @@ Fraud rings are **discovered through recursive analysis** from the generated dat
 
 The recursive queries in `02_Recursive_Fraud_Detection.py` demonstrate this discovery process.
 
-## Production Use: Adapting to Real Data
+## Adapting to Real Data
 
-**Important:** This demo generates synthetic data with relationships derived from shared attributes, and fraud rings are discovered through recursive analysis - the same approach used in production:
+This demo uses the same approach as production systems:
 
-- **Relationships** are derived from data patterns (shared addresses, phone numbers, adjusters, similar patterns, etc.)
+- **Relationships** are derived from data patterns (policyholder connections, temporal patterns, service provider connections)
 - **Fraud rings** are discovered through recursive analysis from relationships
 - Start with known fraud cases and use recursive CTEs to find connected claims
 
-See [PRODUCTION_APPROACH.md](PRODUCTION_APPROACH.md) for detailed guidance on adapting this to real insurance claim data.
+To adapt to your real data, ensure your relationship generation captures:
+1. Policyholder connections (shared addresses, phone numbers, family/business relationships)
+2. Temporal patterns (claims filed within short time windows)
+3. Service provider connections (same adjusters, repair shops, medical providers, attorneys)
 
 ## Analysis Capabilities
 

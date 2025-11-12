@@ -41,7 +41,7 @@ This demo project provides a complete solution for fraud detection using Databri
 - **Policyholders**: Realistic demographic data with geographic distribution
 - **Claims**: Configurable volume with multiple claim types and fraud patterns
 - **Fraud Rings**: Connected networks of fraudsters with coordinated patterns
-- **Relationships**: Rich connections between claims with varying strength indicators
+- **Relationships**: Three types of connections - policyholder connections, temporal patterns, and service provider connections
 - **Adjusters**: Insurance adjuster data with department assignments
 
 ### 🎯 Use Cases Demonstrated
