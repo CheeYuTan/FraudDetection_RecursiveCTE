@@ -19,12 +19,9 @@
 # Create widgets for user configuration
 dbutils.widgets.text("catalog", "dbdemos_steventan", "Catalog Name")
 dbutils.widgets.text("schema", "frauddetection_recursivecte", "Schema/Database Name")
-dbutils.widgets.dropdown("volume_scale", "small", ["small", "medium", "large", "xlarge", "custom"], "Volume Scale")
-dbutils.widgets.text("num_policyholders", "1000", "Number of Policyholders (used if custom)")
-dbutils.widgets.text("num_claims", "5000", "Number of Claims (used if custom)")
+dbutils.widgets.dropdown("volume_scale", "small", ["small", "medium", "large"], "Volume Scale")
 dbutils.widgets.text("fraud_rate", "0.15", "Fraud Rate (0.0-1.0)")
 dbutils.widgets.text("num_adjusters", "50", "Number of Adjusters")
-dbutils.widgets.text("batch_size", "1000000", "Batch Size for Large Datasets (recommended: 1M-10M)")
 dbutils.widgets.dropdown("overwrite_mode", "true", ["true", "false"], "Overwrite Existing Tables")
 
 # COMMAND ----------
