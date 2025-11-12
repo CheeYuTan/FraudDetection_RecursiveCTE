@@ -146,10 +146,10 @@ BEGIN
       WHERE fn.depth < max_depth
         AND c2.claim_id != c1.claim_id
         AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')  -- Prevent cycles
-        -- Filter: Prioritize higher value and fraud claims
-        AND (c2.is_fraud = true OR c2.claim_amount > 10000)
-      ORDER BY c2.is_fraud DESC, c2.claim_amount DESC
-      LIMIT 500  -- Limit expansion at each depth level
+        -- Filter: Only include higher value claims for cleaner visualization
+        AND c2.claim_amount > 15000
+      ORDER BY c2.claim_amount DESC
+      LIMIT 200  -- Limit expansion at each depth level for cleaner graph
     )
   )
   SELECT 
@@ -162,8 +162,8 @@ BEGIN
     depth,
     path
   FROM fraud_network
-  ORDER BY depth, is_fraud DESC, claim_amount DESC
-  LIMIT 1500;
+  ORDER BY depth, claim_amount DESC
+  LIMIT 800;
 END
 """)
 
