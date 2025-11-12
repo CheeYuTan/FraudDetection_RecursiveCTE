@@ -131,7 +131,7 @@ print("Generating policyholders...")
 
 def generate_policyholders_spark(n=1000, spark_session=spark):
     """Generate policyholder data using Spark for scalability"""
-    from pyspark.sql.functions import udf, rand, lit, concat, format_string
+    from pyspark.sql.functions import udf, rand, lit, concat, format_string, expr, col
     from pyspark.sql.types import StringType
     import random
     
@@ -170,7 +170,7 @@ def generate_policyholders_spark(n=1000, spark_session=spark):
                      (rand() * 900 + 100).cast("int"),
                      (rand() * 9000 + 1000).cast("int")).alias("phone"),
         concat(lit("policyholder"), col("id"), lit("@example.com")).alias("email"),
-        (datetime.now() - timedelta(days=int(rand() * 1795 + 30))).strftime('%Y-%m-%d').alias("policy_start_date")
+        expr(f"date_sub(current_date(), cast(rand() * 1795 + 30 as int))").alias("policy_start_date")
     )
     
     # Convert date column
