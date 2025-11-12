@@ -26,7 +26,6 @@ dbutils.widgets.text("fraud_rate", "0.15", "Fraud Rate (0.0-1.0)")
 dbutils.widgets.text("num_adjusters", "50", "Number of Adjusters")
 dbutils.widgets.text("batch_size", "1000000", "Batch Size for Large Datasets (recommended: 1M-10M)")
 dbutils.widgets.dropdown("overwrite_mode", "true", ["true", "false"], "Overwrite Existing Tables")
-dbutils.widgets.dropdown("generate_relationships", "true", ["true", "false"], "Generate Claim Relationships (required for recursive fraud detection)")
 
 # COMMAND ----------
 
@@ -38,7 +37,6 @@ fraud_rate = float(dbutils.widgets.get("fraud_rate"))
 num_adjusters = int(dbutils.widgets.get("num_adjusters"))
 batch_size = int(dbutils.widgets.get("batch_size"))
 overwrite_mode = dbutils.widgets.get("overwrite_mode") == "true"
-generate_relationships = dbutils.widgets.get("generate_relationships") == "true"
 
 # Define volume scales
 volume_configs = {
@@ -418,36 +416,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5: Generate Claim Relationships (Optional)
-# MAGIC 
-# MAGIC **Note:** Relationships can be computed on-demand in recursive queries (recommended for large datasets).
-# MAGIC This step pre-generates relationships for convenience, but recursive queries can compute them dynamically.
-# MAGIC 
-# MAGIC **For large datasets:** Set `generate_relationships = false` and relationships will be computed on-demand in recursive queries.
-
-# COMMAND ----------
-
-if not generate_relationships:
-    print("⚠️  Skipping relationship pre-generation (generate_relationships = false)")
-    print("   Relationships will be computed on-demand in recursive queries (more efficient for large datasets).")
-    print("   Creating empty relationships table for compatibility...")
-    # Create empty relationships table with correct schema
-    from pyspark.sql.types import StructType, StructField, StringType, DoubleType
-    relationships_schema = StructType([
-        StructField("claim_id_1", StringType(), True),
-        StructField("claim_id_2", StringType(), True),
-        StructField("relationship_type", StringType(), True),
-        StructField("strength", DoubleType(), True)
-    ])
-    relationships_df = spark.createDataFrame([], relationships_schema)
-    relationships_count = 0
-    print(f"✓ Created empty relationships table")
-    print(f"  Note: Recursive queries will compute relationships dynamically based on:")
-    print(f"    - Policyholder connections (same address/phone)")
-    print(f"    - Temporal patterns (within 30 days, similar amounts)")
-    print(f"    - Service provider connections (same adjuster)")
-
-if generate_relationships and use_batch_processing:
+# MAGIC ## Step 5: Generate Adjusters
     print("Using optimized Spark-based relationship generation...")
     from pyspark.sql.functions import col, rand, lit, datediff, abs as spark_abs, collect_list, explode, size
     
@@ -670,16 +639,10 @@ elif generate_relationships:
         
         return relationships_df if len(relationships_df) > 0 else pd.DataFrame(columns=['claim_id_1', 'claim_id_2', 'relationship_type', 'strength'])
     
-    relationships_pdf = generate_relationships_pandas(claims_df, policyholders_df)
-    relationships_df = spark.createDataFrame(relationships_pdf)
-    relationships_count = len(relationships_pdf) if len(relationships_pdf) > 0 else 0
-    print(f"✓ Generated {relationships_count:,} relationships")
-    print(f"  Relationship types: policyholder_connection, temporal_pattern, service_provider_connection")
-
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6: Generate Adjusters
+# MAGIC ## Step 5: Generate Adjusters
 
 # COMMAND ----------
 
@@ -706,7 +669,7 @@ print(f"✓ Generated {len(adjusters_pdf):,} adjusters")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 7: Write to Delta Tables
+# MAGIC ## Step 6: Write to Delta Tables
 
 # COMMAND ----------
 
@@ -722,10 +685,6 @@ print(f"✓ Written to {catalog}.{schema}.policyholders")
 claims_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.claims")
 print(f"✓ Written to {catalog}.{schema}.claims")
 
-# Write relationships
-relationships_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.claim_relationships")
-print(f"✓ Written to {catalog}.{schema}.claim_relationships")
-
 # Write adjusters
 adjusters_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.adjusters")
 print(f"✓ Written to {catalog}.{schema}.adjusters")
@@ -733,7 +692,7 @@ print(f"✓ Written to {catalog}.{schema}.adjusters")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 8: Create Enriched Views
+# MAGIC ## Step 7: Create Enriched Views
 
 # COMMAND ----------
 
@@ -769,7 +728,7 @@ print(f"✓ Created view {catalog}.{schema}.claims_enriched")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 9: Dataset Summary
+# MAGIC ## Step 8: Dataset Summary
 
 # COMMAND ----------
 
@@ -781,7 +740,6 @@ if use_batch_processing:
     total_amount = claims_df.agg({"claim_amount": "sum"}).collect()[0][0] or 0
     fraud_amount = claims_df.filter(col("is_fraud") == True).agg({"claim_amount": "sum"}).collect()[0][0] or 0
     fraud_amount_percentage = (fraud_amount / total_amount) * 100 if total_amount > 0 else 0
-    relationships_count = relationships_df.count() if 'relationships_df' in locals() else 0
 else:
     total_claims = claims_pdf.shape[0]
     fraudulent_claims = claims_pdf['is_fraud'].sum()
@@ -789,7 +747,6 @@ else:
     total_amount = claims_pdf['claim_amount'].sum()
     fraud_amount = claims_pdf[claims_pdf['is_fraud']]['claim_amount'].sum()
     fraud_amount_percentage = (fraud_amount / total_amount) * 100 if total_amount > 0 else 0
-    relationships_count = len(relationships_pdf) if 'relationships_pdf' in locals() else 0
 
 print("=" * 60)
 print("DATASET GENERATION COMPLETE")
@@ -798,8 +755,8 @@ print(f"\n📊 Dataset Summary:")
 print(f"  • Policyholders: {num_policyholders:,}")
 print(f"  • Claims: {total_claims:,}")
 print(f"  • Fraudulent Claims: {fraudulent_claims:,} ({fraud_percentage:.1f}%)")
-print(f"  • Relationships: {relationships_count:,}")
 print(f"  • Fraud Rings: Will be discovered through recursive analysis")
+print(f"  • Relationships: Computed on-demand in recursive queries (production approach)")
 print(f"  • Adjusters: {num_adjusters}")
 print(f"\n💰 Financial Summary:")
 print(f"  • Total Claim Amount: ${total_amount:,.2f}")
@@ -808,7 +765,6 @@ print(f"  • Fraud Amount Percentage: {fraud_amount_percentage:.1f}%")
 print(f"\n📁 Tables Created:")
 print(f"  • {catalog}.{schema}.policyholders")
 print(f"  • {catalog}.{schema}.claims")
-print(f"  • {catalog}.{schema}.claim_relationships")
 print(f"  • {catalog}.{schema}.adjusters")
 print(f"  • {catalog}.{schema}.claims_enriched (view)")
 print("=" * 60)
@@ -816,7 +772,7 @@ print("=" * 60)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 10: Preview Data
+# MAGIC ## Step 9: Preview Data
 
 # COMMAND ----------
 
@@ -845,10 +801,9 @@ print("=" * 60)
 # MAGIC 
 # MAGIC Your dataset has been generated and is ready for analysis!
 # MAGIC 
-# MAGIC **Proceed to the next notebooks:**
-# MAGIC 1. **01_Data_Ingestion.py** - (Optional) If you need to reload or transform data
-# MAGIC 2. **02_Recursive_Fraud_Detection.py** - Run recursive queries to detect fraud networks
-# MAGIC 3. **03_Fraud_Analysis_Visualization.py** - Analyze and visualize fraud patterns
+# MAGIC **Proceed to the next notebook:**
 # MAGIC 
-# MAGIC **Note:** Make sure to update the catalog and schema names in the subsequent notebooks to match your configuration above.
+# MAGIC **02_Recursive_Fraud_Detection.py** - Run recursive queries to detect fraud networks using stored procedures. Relationships will be computed on-demand during recursive traversal (production approach).
+# MAGIC 
+# MAGIC **Note:** Make sure to update the catalog and schema names in the subsequent notebook to match your configuration above.
 
