@@ -32,14 +32,18 @@ The demo includes:
 
 ## Setup Instructions
 
-### Step 1: Import Databricks Notebooks
+### Step 1: Clone Repository in Databricks
 
 1. In your Databricks workspace, go to **Workspace**
-2. Create a new folder (e.g., `Fraud_Detection_Demo`)
-3. Import all 3 notebooks from the `notebooks/` directory:
-   - `01_Dataset_Generation.py`
-   - `02_Recursive_Fraud_Detection.py`
-   - `03_Fraud_Analysis_Visualization.py`
+2. Click the dropdown arrow next to your username → **Git** → **Clone Repository**
+3. Enter the repository URL: `https://github.com/CheeYuTan/FraudDetection_RecursiveCTE.git`
+4. Choose a destination folder (e.g., `Fraud_Detection_Demo`)
+5. Click **Clone**
+
+This will clone the entire repository into your workspace, including all 3 notebooks:
+- `notebooks/01_Dataset_Generation.py`
+- `notebooks/02_Recursive_Fraud_Detection.py`
+- `notebooks/03_Fraud_Analysis_Visualization.py`
 
 ### Step 2: Generate Dataset
 

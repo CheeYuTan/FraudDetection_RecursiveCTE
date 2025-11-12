@@ -53,10 +53,12 @@ This demo project provides a complete solution for fraud detection using Databri
 ## How to Use
 
 ### Quick Start
-1. Import notebooks from `notebooks/` directory into Databricks
-2. Run `01_Dataset_Generation.py` - Configure widgets and generate dataset
-3. Run `02_Recursive_Fraud_Detection.py` - Detect fraud networks
-4. Run `03_Fraud_Analysis_Visualization.py` - Analyze and visualize results
+1. Clone the repository in Databricks:
+   - **Workspace** → **Git** → **Clone Repository**
+   - URL: `https://github.com/CheeYuTan/FraudDetection_RecursiveCTE.git`
+2. Run `notebooks/01_Dataset_Generation.py` - Configure widgets and generate dataset
+3. Run `notebooks/02_Recursive_Fraud_Detection.py` - Detect fraud networks
+4. Run `notebooks/03_Fraud_Analysis_Visualization.py` - Analyze and visualize results
 
 ### Expected Results
 

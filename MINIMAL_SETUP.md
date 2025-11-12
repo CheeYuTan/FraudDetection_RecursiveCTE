@@ -28,11 +28,13 @@ That's it! Just 3 notebooks.
 
 ## Quick Start
 
-1. Import `01_Dataset_Generation.py` into Databricks
-2. Set widgets (catalog, schema, etc.)
+1. Clone the repository in Databricks:
+   - Go to **Workspace** → Click dropdown next to username → **Git** → **Clone Repository**
+   - URL: `https://github.com/CheeYuTan/FraudDetection_RecursiveCTE.git`
+2. Open `notebooks/01_Dataset_Generation.py` and set widgets (catalog, schema, etc.)
 3. Run it
-4. Import and run `02_Recursive_Fraud_Detection.py` (set same catalog/schema)
-5. Import and run `03_Fraud_Analysis_Visualization.py` (set same catalog/schema)
+4. Open and run `notebooks/02_Recursive_Fraud_Detection.py` (set same catalog/schema)
+5. Open and run `notebooks/03_Fraud_Analysis_Visualization.py` (set same catalog/schema)
 
 Done! 🎉
 

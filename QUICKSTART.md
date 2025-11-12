@@ -11,13 +11,15 @@ Get up and running with the Fraud Detection Demo in 5 minutes!
    - Adjust other parameters as needed
 3. Run the notebook - data is generated directly in Delta tables!
 
-## Step 2: Import Notebooks (1 minute)
+## Step 2: Clone Repository in Databricks (1 minute)
 
-1. In Databricks workspace, create folder: `Fraud_Detection_Demo`
-2. Import all 3 notebooks from `notebooks/` directory:
-   - `01_Dataset_Generation.py`
-   - `02_Recursive_Fraud_Detection.py`
-   - `03_Fraud_Analysis_Visualization.py`
+1. In Databricks workspace, go to **Workspace**
+2. Click dropdown next to your username → **Git** → **Clone Repository**
+3. Enter: `https://github.com/CheeYuTan/FraudDetection_RecursiveCTE.git`
+4. Choose destination folder (e.g., `Fraud_Detection_Demo`)
+5. Click **Clone**
+
+This clones all notebooks automatically!
 
 ## Step 3: Run Notebooks (1 minute)
 
