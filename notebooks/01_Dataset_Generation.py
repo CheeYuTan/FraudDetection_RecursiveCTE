@@ -473,18 +473,29 @@ print(f"✓ Generated {len(adjusters_pdf):,} adjusters")
 
 print("\nWriting data to Delta tables...")
 
+# Drop tables if overwrite mode to ensure clean schema
+if overwrite_mode:
+    print("Overwrite mode: Dropping existing tables...")
+    spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.policyholders")
+    spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.adjusters")
+    # Claims table already dropped earlier in batch processing
+    print("✓ Existing tables dropped")
+
 write_mode = "overwrite" if overwrite_mode else "append"
 
-# Write policyholders
-policyholders_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.policyholders")
+# Write policyholders with schema merge support
+policyholders_df.write.mode(write_mode).option("mergeSchema", "true").saveAsTable(f"{catalog}.{schema}.policyholders")
 print(f"✓ Written to {catalog}.{schema}.policyholders")
 
-# Write claims
-claims_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.claims")
-print(f"✓ Written to {catalog}.{schema}.claims")
+# Write claims (already handled in batch processing for large datasets)
+if not use_batch_processing:
+    claims_df.write.mode(write_mode).option("mergeSchema", "true").saveAsTable(f"{catalog}.{schema}.claims")
+    print(f"✓ Written to {catalog}.{schema}.claims")
+else:
+    print(f"✓ Claims already written via batch processing to {catalog}.{schema}.claims")
 
-# Write adjusters
-adjusters_df.write.mode(write_mode).saveAsTable(f"{catalog}.{schema}.adjusters")
+# Write adjusters with schema merge support
+adjusters_df.write.mode(write_mode).option("mergeSchema", "true").saveAsTable(f"{catalog}.{schema}.adjusters")
 print(f"✓ Written to {catalog}.{schema}.adjusters")
 
 # COMMAND ----------
