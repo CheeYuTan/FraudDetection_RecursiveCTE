@@ -54,86 +54,44 @@ spark.sql(f"USE SCHEMA {schema}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3: Create Stored Procedures (Optional but Recommended)
+# MAGIC ## Step 3: Create Stored Procedures for Fraud Detection
 # MAGIC 
-# MAGIC Create reusable stored procedures for fraud detection. These can be used as tools in agentic systems.
+# MAGIC We create two essential stored procedures that demonstrate recursive CTEs for fraud detection:
+# MAGIC 
+# MAGIC 1. **`discover_fraud_network`**: Discovers the entire network of related claims starting from a suspicious claim
+# MAGIC 2. **`get_claim_relationships`**: Gets direct relationships for a specific claim (shows what makes claims "connected")
+# MAGIC 
+# MAGIC ### The Story:
+# MAGIC 
+# MAGIC A fraud analyst receives a suspicious claim. They use:
+# MAGIC - `get_claim_relationships()` to see what other claims are directly related and why
+# MAGIC - `discover_fraud_network()` to explore the full network using recursive CTEs, revealing potential fraud rings
+# MAGIC 
+# MAGIC These procedures can be called interactively or used as tools in agentic systems for automated fraud detection.
 
 # COMMAND ----------
 
-# Stored Procedure 1: Fraud Network BFS (Breadth-First Search)
-# Uses on-demand relationship computation
+# Stored Procedure 1: Discover Fraud Network (Main Recursive Demo)
+# This is the core demonstration of recursive CTEs for fraud detection
 spark.sql(f"""
-CREATE OR REPLACE PROCEDURE {catalog}.{schema}.fraud_network_bfs(
-  start_claim_id STRING,
-  max_depth INT
-)
-LANGUAGE SQL
-SQL SECURITY INVOKER
-AS
-BEGIN
-  WITH RECURSIVE fraud_network AS (
-    SELECT 
-      c.claim_id,
-      c.policyholder_id,
-      c.claim_amount,
-      c.is_fraud,
-      0 as depth,
-      CAST(c.claim_id AS STRING) as path,
-      c.claim_id as root_claim_id
-    FROM {catalog}.{schema}.claims c
-    WHERE c.claim_id = start_claim_id
-    
-    UNION ALL
-    
-    SELECT 
-      c2.claim_id,
-      c2.policyholder_id,
-      c2.claim_amount,
-      c2.is_fraud,
-      fn.depth + 1,
-      CONCAT(fn.path, ' -> ', c2.claim_id) as path,
-      fn.root_claim_id
-    FROM fraud_network fn
-    INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-    INNER JOIN {catalog}.{schema}.claims c2 ON c2.claim_id != c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p2 ON c2.policyholder_id = p2.policyholder_id
-    WHERE fn.depth < max_depth
-      AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')
-      AND (
-        (p1.address = p2.address AND p1.address IS NOT NULL) OR
-        (p1.phone = p2.phone AND p1.phone IS NOT NULL) OR
-        (c1.claim_type = c2.claim_type AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 30 AND
-         ABS(c1.claim_amount - c2.claim_amount) < c1.claim_amount * 0.3) OR
-        (c1.adjuster_id = c2.adjuster_id AND 
-         ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
-      )
-  )
-  SELECT * FROM fraud_network;
-END
-""")
-
-# COMMAND ----------
-
-# Stored Procedure 2: Discover Fraud Network for Specific Claim (Optimized)
-spark.sql(f"""
-CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network_for_claim(
+CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network(
   start_claim_id STRING,
   max_depth INT DEFAULT 3
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
-COMMENT 'Discover the fraud network starting from a specific claim ID (optimized for performance)'
+COMMENT 'Discovers fraud network using recursive CTEs - starting from a specific claim, finds all connected claims through shared policyholders'
 AS
 BEGIN
   WITH RECURSIVE fraud_network AS (
-    -- Base case: Start from the given claim
+    -- Base case: Start from the suspicious claim
     SELECT 
       c.claim_id,
       c.policyholder_id,
       c.claim_amount,
       c.is_fraud,
+      c.claim_type,
+      c.claim_date,
       0 as depth,
       CAST(c.claim_id AS STRING) as path
     FROM {catalog}.{schema}.claims c
@@ -141,31 +99,37 @@ BEGIN
     
     UNION ALL
     
-    -- Recursive case: Find connected claims (optimized with direct joins)
+    -- Recursive case: Find connected claims through shared policyholders
+    -- This is where the recursion happens - we keep expanding the network
     SELECT DISTINCT
       c2.claim_id,
       c2.policyholder_id,
       c2.claim_amount,
       c2.is_fraud,
+      c2.claim_type,
+      c2.claim_date,
       fn.depth + 1,
       CONCAT(fn.path, ' -> ', c2.claim_id) as path
     FROM fraud_network fn
     INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
     INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
     INNER JOIN {catalog}.{schema}.policyholders p2 ON (
+      -- Connection logic: policyholders are related if they share address or phone
       (p1.address = p2.address AND p1.address IS NOT NULL) OR
       (p1.phone = p2.phone AND p1.phone IS NOT NULL)
     )
     INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
     WHERE fn.depth < max_depth
       AND c2.claim_id != c1.claim_id
-      AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')
+      AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')  -- Prevent cycles
   )
   SELECT 
     claim_id,
     policyholder_id,
     claim_amount,
     is_fraud,
+    claim_type,
+    claim_date,
     depth,
     path
   FROM fraud_network
@@ -176,14 +140,15 @@ END
 
 # COMMAND ----------
 
-# Stored Procedure 3: Get Claim Relationships (On-Demand)
-# Computes relationships for a specific claim without pre-generation
+# Stored Procedure 2: Get Claim Relationships (Supporting Analysis)
+# Shows the relationship logic - helps understand WHY claims are connected
 spark.sql(f"""
 CREATE OR REPLACE PROCEDURE {catalog}.{schema}.get_claim_relationships(
   target_claim_id STRING
 )
 LANGUAGE SQL
 SQL SECURITY INVOKER
+COMMENT 'Gets direct relationships for a claim - shows policyholder connections, temporal patterns, and service provider links'
 AS
 BEGIN
   WITH target_claim AS (
@@ -199,232 +164,173 @@ BEGIN
     FROM {catalog}.{schema}.claims c
     INNER JOIN {catalog}.{schema}.policyholders p ON c.policyholder_id = p.policyholder_id
     WHERE c.claim_id = target_claim_id
-  ),
-  related_claims AS (
-    -- 1. Policyholder connections: Same address or phone
-    SELECT DISTINCT
-      c.claim_id as related_claim_id,
-      'policyholder_connection' as relationship_type,
-      0.8 as strength
-    FROM {catalog}.{schema}.claims c
-    INNER JOIN {catalog}.{schema}.policyholders p ON c.policyholder_id = p.policyholder_id
-    CROSS JOIN target_claim tc
-    WHERE c.claim_id != tc.claim_id
-      AND (
-        (p.address = tc.address AND p.address IS NOT NULL) OR
-        (p.phone = tc.phone AND p.phone IS NOT NULL)
-      )
-    
-    UNION
-    
-    -- 2. Temporal patterns: Same claim type, within 30 days, similar amounts
-    SELECT DISTINCT
-      c.claim_id as related_claim_id,
-      'temporal_pattern' as relationship_type,
-      0.6 as strength
-    FROM {catalog}.{schema}.claims c
-    CROSS JOIN target_claim tc
-    WHERE c.claim_id != tc.claim_id
-      AND c.claim_type = tc.claim_type
-      AND ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 30
-      AND ABS(c.claim_amount - tc.claim_amount) < tc.claim_amount * 0.3
-    
-    UNION
-    
-    -- 3. Service provider connections: Same adjuster, within 90 days
-    SELECT DISTINCT
-      c.claim_id as related_claim_id,
-      'service_provider_connection' as relationship_type,
-      0.7 as strength
-    FROM {catalog}.{schema}.claims c
-    CROSS JOIN target_claim tc
-    WHERE c.claim_id != tc.claim_id
-      AND c.adjuster_id = tc.adjuster_id
-      AND ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 90
   )
-  SELECT * FROM related_claims;
-END
-""")
-
-# COMMAND ----------
-
-# Stored Procedure 4: Discover Fraud Network for Specific Policyholder (Optimized)
-spark.sql(f"""
-CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_network_for_policyholder(
-  target_policyholder_id STRING,
-  max_depth INT DEFAULT 3
-)
-LANGUAGE SQL
-SQL SECURITY INVOKER
-COMMENT 'Discover the fraud network starting from a specific policyholder ID (optimized for performance)'
-AS
-BEGIN
-  WITH RECURSIVE fraud_network AS (
-    -- Base case: Start from all claims of the given policyholder
-    SELECT 
-      c.claim_id,
-      c.policyholder_id,
-      c.claim_amount,
-      c.is_fraud,
-      0 as depth,
-      CAST(c.claim_id AS STRING) as path
-    FROM {catalog}.{schema}.claims c
-    WHERE c.policyholder_id = target_policyholder_id
-    
-    UNION ALL
-    
-    -- Recursive case: Find connected claims via shared policyholders (optimized)
-    SELECT DISTINCT
-      c2.claim_id,
-      c2.policyholder_id,
-      c2.claim_amount,
-      c2.is_fraud,
-      fn.depth + 1,
-      CONCAT(fn.path, ' -> ', c2.claim_id) as path
-    FROM fraud_network fn
-    INNER JOIN {catalog}.{schema}.claims c1 ON fn.claim_id = c1.claim_id
-    INNER JOIN {catalog}.{schema}.policyholders p1 ON c1.policyholder_id = p1.policyholder_id
-    INNER JOIN {catalog}.{schema}.policyholders p2 ON (
-      (p1.address = p2.address AND p1.address IS NOT NULL) OR
-      (p1.phone = p2.phone AND p1.phone IS NOT NULL)
+  SELECT DISTINCT
+    c.claim_id as related_claim_id,
+    c.claim_amount,
+    c.is_fraud,
+    c.claim_type,
+    CASE 
+      WHEN (p.address = tc.address AND p.address IS NOT NULL) THEN 'Same Address'
+      WHEN (p.phone = tc.phone AND p.phone IS NOT NULL) THEN 'Same Phone'
+      WHEN (c.claim_type = tc.claim_type AND 
+            ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 30 AND
+            ABS(c.claim_amount - tc.claim_amount) < tc.claim_amount * 0.3) THEN 'Temporal Pattern'
+      WHEN (c.adjuster_id = tc.adjuster_id AND 
+            ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 90) THEN 'Same Adjuster'
+      ELSE 'Unknown'
+    END as relationship_type
+  FROM {catalog}.{schema}.claims c
+  INNER JOIN {catalog}.{schema}.policyholders p ON c.policyholder_id = p.policyholder_id
+  CROSS JOIN target_claim tc
+  WHERE c.claim_id != tc.claim_id
+    AND (
+      (p.address = tc.address AND p.address IS NOT NULL) OR
+      (p.phone = tc.phone AND p.phone IS NOT NULL) OR
+      (c.claim_type = tc.claim_type AND 
+       ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 30 AND
+       ABS(c.claim_amount - tc.claim_amount) < tc.claim_amount * 0.3) OR
+      (c.adjuster_id = tc.adjuster_id AND 
+       ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 90)
     )
-    INNER JOIN {catalog}.{schema}.claims c2 ON c2.policyholder_id = p2.policyholder_id
-    WHERE fn.depth < max_depth
-      AND c2.claim_id != c1.claim_id
-      AND fn.path NOT LIKE CONCAT('%', c2.claim_id, '%')
-  )
-  SELECT 
-    claim_id,
-    policyholder_id,
-    claim_amount,
-    is_fraud,
-    depth,
-    path
-  FROM fraud_network
-  ORDER BY depth, claim_id
-  LIMIT 1000;
+  ORDER BY relationship_type, related_claim_id
+  LIMIT 100;
 END
 """)
 
 # COMMAND ----------
 
 print("✓ Stored procedures created successfully!")
-print(f"  - {catalog}.{schema}.fraud_network_bfs")
-print(f"  - {catalog}.{schema}.discover_fraud_network_for_claim")
-print(f"  - {catalog}.{schema}.get_claim_relationships")
-print(f"  - {catalog}.{schema}.discover_fraud_network_for_policyholder")
-print("\nYou can now use these stored procedures as reusable tools!")
-print("Note: All procedures use on-demand relationship computation and require specific claim/policyholder IDs")
+print(f"\n📊 Available Procedures:")
+print(f"  1. {catalog}.{schema}.discover_fraud_network(claim_id, max_depth)")
+print(f"     → Discovers entire fraud network using recursive CTEs")
+print(f"\n  2. {catalog}.{schema}.get_claim_relationships(claim_id)")
+print(f"     → Shows direct relationships and why claims are connected")
+print(f"\n💡 These procedures use on-demand relationship computation (production approach)")
+print(f"   No pre-generated relationship tables needed!")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4: Discover Fraud Network for Specific Claims
+# MAGIC ## Step 4: Using the Stored Procedures - The Fraud Investigation Story
 # MAGIC 
-# MAGIC Use stored procedures to discover fraud networks starting from specific claims or policyholders.
-# MAGIC This approach is more practical for production use and avoids recursion limits.
-
-# COMMAND ----------
-
-# First, get a sample claim to explore
-sample_claim = spark.sql(f"""
-SELECT claim_id, policyholder_id, is_fraud, claim_amount
-FROM {catalog}.{schema}.claims 
-WHERE is_fraud = true 
-LIMIT 1
-""").collect()
-
-if sample_claim:
-    sample_claim_id = sample_claim[0]['claim_id']
-    sample_policyholder_id = sample_claim[0]['policyholder_id']
-    print(f"Sample fraudulent claim: {sample_claim_id}")
-    print(f"Sample policyholder: {sample_policyholder_id}")
-else:
-    sample_claim_id = 'CLM00000001'
-    sample_policyholder_id = 'PH000001'
-    print(f"No fraudulent claims found, using examples")
-
-# COMMAND ----------
-
-# Discover fraud network starting from a specific claim
-# Note: Using max_depth=3 for better performance (can be increased if needed)
-result_df = spark.sql(f"""
-CALL {catalog}.{schema}.discover_fraud_network_for_claim(
-  start_claim_id => '{sample_claim_id}',
-  max_depth => 3
-)
-""")
-print(f"Found {result_df.count()} claims in the fraud network")
-result_df.show(50, truncate=False)
-
-# COMMAND ----------
-
-# Discover fraud network starting from a specific policyholder
-# Note: Using max_depth=3 for better performance (can be increased if needed)
-result_df = spark.sql(f"""
-CALL {catalog}.{schema}.discover_fraud_network_for_policyholder(
-  target_policyholder_id => '{sample_policyholder_id}',
-  max_depth => 3
-)
-""")
-print(f"Found {result_df.count()} claims in the fraud network")
-result_df.show(50, truncate=False)
+# MAGIC Let's walk through a typical fraud investigation workflow using our recursive stored procedures.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5: Example - Get Relationships for a Specific Claim
+# MAGIC ### Step 4a: Identify a Suspicious Claim
 # MAGIC 
-# MAGIC Use the stored procedure to get relationships on-demand for any claim:
+# MAGIC First, we identify a suspicious claim to investigate. In production, this might come from:
+# MAGIC - Automated fraud detection models
+# MAGIC - Manual reports from adjusters
+# MAGIC - Pattern analysis (high value, multiple claims, etc.)
 
 # COMMAND ----------
 
-# Get relationships for a specific claim (on-demand computation)
-# First, let's pick a fraudulent claim to explore
-sample_claim = spark.sql(f"""
-SELECT claim_id 
+# Find a high-value fraudulent claim to investigate
+suspicious_claims = spark.sql(f"""
+SELECT 
+  claim_id,
+  policyholder_id,
+  claim_type,
+  claim_amount,
+  claim_date,
+  is_fraud
 FROM {catalog}.{schema}.claims 
-WHERE is_fraud = true 
-LIMIT 1
-""").collect()
-if sample_claim:
-    sample_claim_id = sample_claim[0]['claim_id']
-    print(f"Sample fraudulent claim: {sample_claim_id}")
-else:
-    sample_claim_id = 'CLM00000001'
-    print(f"No fraudulent claims found, using example: {sample_claim_id}")
+WHERE is_fraud = true
+  AND claim_amount > 10000
+ORDER BY claim_amount DESC
+LIMIT 5
+""")
+
+print("🔍 Top suspicious claims:")
+suspicious_claims.show(truncate=False)
+
+# Get the first one for investigation
+sample_claim = suspicious_claims.collect()[0]
+target_claim_id = sample_claim['claim_id']
+print(f"\n📌 Investigating claim: {target_claim_id}")
+print(f"   Amount: ${sample_claim['claim_amount']:,.2f}")
+print(f"   Type: {sample_claim['claim_type']}")
 
 # COMMAND ----------
 
-# Get relationships for the sample claim (on-demand computation)
-# This computes relationships on-demand without needing pre-generated relationships table
+# MAGIC %md
+# MAGIC ### Step 4b: Understand Direct Relationships
+# MAGIC 
+# MAGIC Before exploring the full network, let's see what makes this claim suspicious by examining its direct relationships.
+
+# COMMAND ----------
+
+# Get direct relationships for the suspicious claim
+print(f"🔗 Finding direct relationships for claim {target_claim_id}...\n")
+
 relationships_df = spark.sql(f"""
-CALL {catalog}.{schema}.get_claim_relationships('{sample_claim_id}')
+CALL {catalog}.{schema}.get_claim_relationships('{target_claim_id}')
 """)
-relationships_df.show(20, truncate=False)
+
+relationship_count = relationships_df.count()
+print(f"Found {relationship_count} related claims")
+
+if relationship_count > 0:
+    relationships_df.show(20, truncate=False)
+    
+    # Summary by relationship type
+    print("\n📊 Relationship Type Summary:")
+    relationships_df.groupBy("relationship_type").count().orderBy("count", ascending=False).show()
+else:
+    print("No direct relationships found for this claim")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6: Example - BFS from a Specific Claim
+# MAGIC ### Step 4c: Discover the Full Fraud Network
 # MAGIC 
-# MAGIC Use breadth-first search to explore a claim's network:
+# MAGIC Now we use the recursive CTE stored procedure to discover the entire fraud network.
+# MAGIC This is where the **recursion magic** happens - we traverse through connected claims to reveal potential fraud rings!
 
 # COMMAND ----------
 
-# BFS from a specific claim
-bfs_result = spark.sql(f"""
-CALL {catalog}.{schema}.fraud_network_bfs(
-  start_claim_id => '{sample_claim_id}',
+# Discover the full fraud network using recursive CTEs
+print(f"🕸️  Discovering fraud network for claim {target_claim_id}...")
+print(f"   Using recursive CTEs with max_depth=3\n")
+
+network_df = spark.sql(f"""
+CALL {catalog}.{schema}.discover_fraud_network(
+  start_claim_id => '{target_claim_id}',
   max_depth => 3
 )
 """)
-bfs_result.show(50, truncate=False)
+
+network_count = network_df.count()
+print(f"✓ Found {network_count} claims in the fraud network")
+
+if network_count > 0:
+    # Show the network
+    network_df.show(50, truncate=False)
+    
+    # Network statistics
+    print("\n📈 Network Statistics:")
+    network_stats = network_df.groupBy("depth").agg(
+        count("*").alias("claim_count"),
+        sum("claim_amount").alias("total_amount"),
+        sum(when(col("is_fraud"), 1).otherwise(0)).alias("fraud_count")
+    ).orderBy("depth")
+    network_stats.show()
+    
+    # Total network impact
+    total_amount = network_df.agg(sum("claim_amount")).collect()[0][0]
+    total_fraud = network_df.filter(col("is_fraud")).count()
+    print(f"\n💰 Total Network Value: ${total_amount:,.2f}")
+    print(f"🚨 Fraudulent Claims in Network: {total_fraud}/{network_count} ({total_fraud/network_count*100:.1f}%)")
+else:
+    print("This claim appears to be isolated (no network connections found)")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 7: Summary Statistics (Non-Recursive Analysis)
+# MAGIC ## Step 5: Summary Statistics (Non-Recursive Analysis)
 # MAGIC 
 # MAGIC These queries provide useful insights without using recursion, making them fast and reliable for large datasets.
 
@@ -509,20 +415,28 @@ shared_addresses.show(truncate=False)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Production Usage Notes
+# MAGIC ## Production Usage Guide
 # MAGIC 
 # MAGIC ### Recommended Workflow for Fraud Investigation:
 # MAGIC 
-# MAGIC 1. **Identify Suspicious Claims**: Use non-recursive queries (like Step 7) to find high-risk claims or policyholders
-# MAGIC 2. **Investigate Specific Claims**: Use `discover_fraud_network_for_claim()` to explore networks around suspicious claims
-# MAGIC 3. **Investigate Policyholders**: Use `discover_fraud_network_for_policyholder()` to explore all claims in a policyholder's network
-# MAGIC 4. **Get Detailed Relationships**: Use `get_claim_relationships()` to see what connects two claims
-# MAGIC 5. **BFS Exploration**: Use `fraud_network_bfs()` for detailed path analysis from a specific claim
+# MAGIC 1. **Identify Suspicious Claims**: Use non-recursive queries (Step 5) or ML models to find high-risk claims
+# MAGIC 2. **Understand Relationships**: Call `get_claim_relationships(claim_id)` to see direct connections
+# MAGIC 3. **Discover Network**: Call `discover_fraud_network(claim_id, depth)` to reveal the full fraud ring using recursive CTEs
+# MAGIC 4. **Take Action**: Prioritize investigation of connected high-value or fraudulent claims in the network
 # MAGIC 
 # MAGIC ### Performance Tips:
 # MAGIC 
-# MAGIC - Start with `max_depth=2` or `max_depth=3` for initial exploration
-# MAGIC - Only increase depth if you need to go further into the network
-# MAGIC - Use the non-recursive queries in Step 7 to identify candidates for recursive investigation
-# MAGIC - The stored procedures are optimized for individual claim/policyholder investigation, not bulk processing
+# MAGIC - **Start with `max_depth=2` or `3`**: Recursion grows exponentially, so start shallow
+# MAGIC - **Investigate specific claims**: These procedures are designed for targeted investigation, not bulk processing
+# MAGIC - **Use Step 5 for bulk analysis**: Non-recursive queries are faster for finding candidates
+# MAGIC - **Adjust based on results**: If you find a large network, reduce depth; if isolated, try increasing
+# MAGIC 
+# MAGIC ### Integration with Agentic Systems:
+# MAGIC 
+# MAGIC These stored procedures can be called by AI agents:
+# MAGIC ```python
+# MAGIC # Agent receives suspicious claim ID
+# MAGIC result = spark.sql(f"CALL discover_fraud_network('{claim_id}', 3)")
+# MAGIC # Agent analyzes network and takes action
+# MAGIC ```
 
