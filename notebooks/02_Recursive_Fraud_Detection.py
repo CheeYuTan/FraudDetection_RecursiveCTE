@@ -69,6 +69,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.fraud_network_bfs(
 )
 LANGUAGE SQL
 AS
+BEGIN
   WITH RECURSIVE fraud_network AS (
     SELECT 
       c.claim_id,
@@ -108,7 +109,8 @@ AS
          ABS(DATEDIFF(c1.claim_date, c2.claim_date)) < 90)
       )
   )
-  SELECT * FROM fraud_network
+  SELECT * FROM fraud_network;
+END
 """)
 
 # COMMAND ----------
@@ -121,6 +123,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks(
 )
 LANGUAGE SQL
 AS
+BEGIN
   WITH RECURSIVE fraud_network AS (
     SELECT 
       c.claim_id,
@@ -170,7 +173,8 @@ AS
   FROM fraud_network
   GROUP BY root_claim_id
   HAVING network_size >= min_network_size
-  ORDER BY network_size DESC, total_network_amount DESC
+  ORDER BY network_size DESC, total_network_amount DESC;
+END
 """)
 
 # COMMAND ----------
@@ -183,6 +187,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.get_claim_relationships(
 )
 LANGUAGE SQL
 AS
+BEGIN
   WITH target_claim AS (
     SELECT 
       c.claim_id,
@@ -239,7 +244,8 @@ AS
       AND c.adjuster_id = tc.adjuster_id
       AND ABS(DATEDIFF(c.claim_date, tc.claim_date)) < 90
   )
-  SELECT * FROM related_claims
+  SELECT * FROM related_claims;
+END
 """)
 
 # COMMAND ----------
@@ -253,6 +259,7 @@ CREATE OR REPLACE PROCEDURE {catalog}.{schema}.discover_fraud_networks_ondemand(
 )
 LANGUAGE SQL
 AS
+BEGIN
   WITH RECURSIVE fraud_network AS (
     SELECT 
       c.claim_id,
@@ -301,7 +308,8 @@ AS
   FROM fraud_network
   GROUP BY root_claim_id
   HAVING network_size >= min_network_size
-  ORDER BY network_size DESC, total_network_amount DESC
+  ORDER BY network_size DESC, total_network_amount DESC;
+END
 """)
 
 # COMMAND ----------
