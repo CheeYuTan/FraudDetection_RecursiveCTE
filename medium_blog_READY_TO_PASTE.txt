@@ -16,6 +16,8 @@ The real money is in the fraud rings — coordinated networks of fraudsters usin
 
 The problem? Traditional SQL can't find them.
 
+[📊 INSERT IMAGE/INFOGRAPHIC: The $80B Fraud Problem - Show fraud statistics or industry impact visualization]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Why Traditional Fraud Detection Falls Short
@@ -32,6 +34,8 @@ Manual Investigation (The Old Way):
 
 Result: You find 6-10 connected claims. The fraud ring has 47 members with $1.2M in fraudulent claims. You missed 85% of it.
 
+[🎯 INSERT GIF/ANIMATION: Manual investigation process - Could show analyst clicking through multiple screens/tables, looking frustrated]
+
 Traditional SQL Queries (Still Limited):
 
 -- This only finds claims from the SAME policyholder
@@ -40,6 +44,8 @@ SELECT * FROM claims WHERE policyholder_id = 'PH12345';
 This misses the fraud ring entirely because they're smart enough to use multiple fake identities.
 
 The Core Problem: Fraud networks require exploring relationships 2, 3, or 4 degrees away from the starting point. Traditional SQL can't traverse networks. You'd need to write separate queries for each "hop" — and fraud rings can be 5+ levels deep.
+
+[📉 INSERT DIAGRAM: Traditional SQL Limitation - Simple diagram showing how traditional queries only see 1 level deep]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -62,6 +68,8 @@ Graph network analysis thinks in nodes and edges:
 • Nodes = Claims, Policyholders, Adjusters, Service Providers
 • Edges = Relationships (filed by, processed by, shares address, same timing)
 • Network traversal = Follow connections to discover fraud rings
+
+[🔄 INSERT DIAGRAM/ANIMATION: Graph Network Concept - Simple visualization showing nodes and edges, maybe animated to show traversal]
 
 Graph Traversal with Recursive SQL
 
@@ -93,13 +101,15 @@ What this does (graph traversal perspective):
 
 This is true graph network analysis — but done entirely in SQL on your existing data warehouse, no specialized graph database required.
 
+[💻 INSERT CODE SCREENSHOT: Optional - Syntax-highlighted version of the recursive SQL above for visual appeal]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Seeing is Believing: Network Graph Visualization
 
 Traditional fraud detection gives you a list of claim IDs. Graph network analysis gives you the complete picture — a visual network showing how everything connects:
 
-[INSERT IMAGE: Claim Network Graph]
+[🎨 INSERT MAIN IMAGE: Claim Network Graph - Use claim_network_graph.png from your repo]
 
 What you're looking at (network graph elements):
 🔴 Red nodes = Confirmed fraudulent claims (fraud vertices in the graph)
@@ -110,6 +120,8 @@ What you're looking at (network graph elements):
 
 This network graph shows 454 claims connected to the original suspicious claim — including 45 fraudulent claims (9.9%) totaling hundreds of thousands of dollars. The visual clustering immediately reveals coordinated fraud patterns that would be invisible in a spreadsheet.
 
+[⏱️ INSERT COMPARISON GRAPHIC: Side-by-side comparison "2-5 days vs 8 seconds" with icons]
+
 Time to discover this network graph:
 ⏱️ Manual investigation: 2-5 days
 ⏱️ Graph network analysis with recursive SQL: 8 seconds
@@ -118,7 +130,7 @@ The Multi-Entity Fraud Network Graph
 
 Going deeper, we can visualize the complete fraud ecosystem as a heterogeneous network graph — not just claims, but multiple entity types and their relationships:
 
-[INSERT IMAGE: Multi-Entity Network Graph]
+[🌐 INSERT MAIN IMAGE: Multi-Entity Network Graph - Use multi_entity_network_graph.png from your repo]
 
 Network Graph Legend (Multiple Node Types):
 🔴🔵 Circles (Claim Nodes) = Claims (red = fraud, blue = legitimate)
@@ -136,6 +148,8 @@ What this network graph reveals:
 • Network motifs = Structural patterns indicating the full "fraud factory" operation
 
 This is multi-entity graph analysis — treating your business data as a heterogeneous network where different entity types connect through different relationship types. The visual topology immediately reveals fraud patterns that are invisible in traditional table-based analysis.
+
+[🔎 INSERT SCREENSHOT/GIF: Optional - Show the interactive graph in action (zooming, clicking nodes, etc.)]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -171,6 +185,8 @@ Annual Impact:
 • Cost savings: $400K+ in labor costs
 
 Total annual value: $325M+ in fraud prevention and recovery
+
+[💰 INSERT INFOGRAPHIC: ROI Calculator - Visual representation of the $325M+ value, maybe a chart or comparison graphic]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -212,6 +228,8 @@ The system automatically prioritizes investigations using graph metrics:
 • Centrality scores = Key players in the fraud ring (high-degree nodes)
 • Temporal activity = Network growth rate and recency
 
+[📋 INSERT FLOWCHART/DIAGRAM: Optional - Visual workflow showing the 4 steps above as a process flow]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Production Deployment: Built for Scale
@@ -237,6 +255,8 @@ The demo includes production-grade optimizations:
 • Caps network expansion to prevent database overload
 • Prioritizes fraudulent claims in results
 • Uses indexed joins for maximum performance
+
+[⚡ INSERT CHART/GRAPHIC: Performance metrics - Show sub-minute execution times, scalability chart]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -279,6 +299,8 @@ Quick Start (3 Steps)
 
 That's it. You'll have a working fraud detection system analyzing networks in under an hour.
 
+[📸 INSERT SCREENSHOT: Databricks workspace/notebook preview - Show what users will see in the demo]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Real-World Use Cases Beyond Insurance
@@ -306,6 +328,8 @@ Telecommunications:
 • Service abuse patterns
 
 Any industry where fraud is networked and connected.
+
+[🏢 INSERT ICONS/GRAPHICS: Industry icons showing the various use cases - Banking, Healthcare, Retail, Telecom symbols]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -353,6 +377,8 @@ Databricks Recursive SQL isn't just a technical feature — it's a business game
 
 ...makes this one of the highest-ROI fraud prevention tools available today.
 
+[📊 INSERT SUMMARY GRAPHIC: Key benefits summary - 4-quadrant visual showing Speed/Scale/Completeness/Cost]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Try It Yourself
@@ -363,7 +389,11 @@ The complete demo with all code, data generation, and interactive visualizations
 
 Have questions about implementing this in your organization? Connect with me on LinkedIn or reach out through GitHub. I'm happy to discuss how graph network analysis can transform your fraud detection capabilities.
 
+[🔗 INSERT CALL-TO-ACTION BANNER: Optional - Eye-catching CTA with GitHub link and "Try the Demo" button visual]
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[👤 INSERT AUTHOR PHOTO: Optional - Professional headshot]
 
 Steven Tan is a data engineering professional specializing in fraud detection, graph network analysis, and production data systems. This demo showcases how to perform enterprise-scale graph network analysis using Databricks recursive SQL — bringing graph analytics capabilities to your data warehouse without separate graph databases.
 
