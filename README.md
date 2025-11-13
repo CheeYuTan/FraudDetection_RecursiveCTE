@@ -16,7 +16,7 @@ The demo includes:
 ### Claim Network Graph
 Interactive network showing how fraudulent claims connect through shared policyholders:
 
-![Claim Network Graph](images/claim_network_graph.png?v=2)
+![Claim Network Graph](images/claim_network_graph.png?v=3)
 
 **Features:**
 - 🖱️ **Drag nodes** to rearrange the network
@@ -39,7 +39,7 @@ Interactive network showing how fraudulent claims connect through shared policyh
 ### Multi-Entity Network Graph
 Advanced visualization showing the complete fraud ecosystem with multiple entity types:
 
-![Multi-Entity Network Graph](images/multi_entity_network_graph.png?v=2)
+![Multi-Entity Network Graph](images/multi_entity_network_graph.png?v=3)
 
 **Entity Types:**
 - 🔴🔵 **Circles** = Claims (red=fraud, blue=legitimate)
@@ -75,7 +75,7 @@ Advanced visualization showing the complete fraud ecosystem with multiple entity
 
 ## Prerequisites
 
-- Databricks workspace (or Databricks Community Edition)
+- Databricks workspace (or Databricks free edition)
 - **Databricks Runtime 17.0 or later** (required for recursive CTE support and optimized performance)
 
 ## Setup Instructions
@@ -84,7 +84,7 @@ Advanced visualization showing the complete fraud ecosystem with multiple entity
 
 1. In your Databricks workspace, go to **Workspace**
 2. Click the dropdown arrow next to your username → **Git** → **Clone Repository**
-3. Enter the repository URL: `https://github.com/CheeYuTan/FraudDetection_RecursiveCTE.git`
+3. Enter the repository URL: `https://github.com/CheeYuTan/FraudDetection_RecursiveCTE`
 4. Choose a destination folder (e.g., `Fraud_Detection_Demo`)
 5. Click **Clone**
 
