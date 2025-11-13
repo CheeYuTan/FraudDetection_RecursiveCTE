@@ -6,9 +6,9 @@
 
 ---
 
-## The $80 Billion Problem
+## The $308 Billion Problem
 
-Insurance fraud costs the industry over **$80 billion annually** in the United States alone. But here's what keeps fraud investigators up at night: **they know they're only catching the obvious cases**.
+Insurance fraud costs Americans approximately **$308.6 billion annually** — that's **$933 per person per year**, according to a 2022 study by the Coalition Against Insurance Fraud[^1]. But here's what keeps fraud investigators up at night: **they know they're only catching the obvious cases**.
 
 Traditional fraud detection systems can flag suspicious individual claims — a suspiciously high medical bill, an accident reported too soon after policy activation, or claims from known high-risk areas. But organized fraud? That's where things get complicated.
 
@@ -366,4 +366,10 @@ The complete demo with all code, data generation, and interactive visualizations
 ---
 
 *Steven Tan is a data engineering professional specializing in fraud detection, graph network analysis, and production data systems. This demo showcases how to perform enterprise-scale graph network analysis using Databricks recursive SQL — bringing graph analytics capabilities to your data warehouse without separate graph databases.*
+
+---
+
+## References
+
+[^1]: Coalition Against Insurance Fraud (2022). "The Impact of Insurance Fraud on the U.S. Economy." Available at: https://www.insurancefraud.org/
 
