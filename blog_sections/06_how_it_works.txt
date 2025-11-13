@@ -1,42 +1,70 @@
-How It Works (The Business View)
+How It Works: The Fraud Investigation Workflow
 
-1. Network Graph Construction
+Following the actual workflow from the demo notebooks, here's how fraud network analysis works in practice:
 
-The system continuously builds a graph from your transactional data:
-• Nodes = Claims, Policyholders, Adjusters, Service Providers
-• Edges = Relationships detected from shared attributes:
-  - Policyholders sharing addresses or phone numbers (identity network)
-  - Claims handled by the same service providers (service network)
-  - Temporal patterns (timeline network)
+1. Data Preparation (Notebook 01)
 
-2. Graph Traversal & Network Discovery
+First, you need your insurance data in Delta tables:
+• Policyholders table (with addresses, phone numbers, demographics)
+• Claims table (with claim amounts, dates, types, fraud flags)
+• Adjusters table (service providers who process claims)
 
-When a suspicious claim is flagged (by your existing fraud detection rules):
-• Recursive SQL performs breadth-first graph traversal from the flagged node
-• Automatically explores all edges and connected nodes
-• Discovers the full fraud subgraph in seconds
-• Maps network relationships 3-4 hops deep
-• Identifies all involved entities (parties, service providers)
+The demo includes a synthetic data generator that creates realistic fraud patterns, but in production, you'd use your existing transactional data.
 
-3. Interactive Network Graph Visualization
+2. Identify a Suspicious Claim
 
-Fraud analysts see the complete fraud network as an interactive graph:
-• Visual network topology (drag nodes, zoom, pan around the graph)
-• Color-coded nodes (fraud vs. legitimate, different entity types)
-• Network metrics (centrality, clustering, total exposure)
-• Path visualization (how entities connect through the network)
-• Actionable intelligence for law enforcement with visual proof
+A fraud analyst flags a suspicious claim — typically identified by:
+• Automated fraud detection models
+• Manual reports from adjusters
+• Pattern analysis (high value, multiple claims, unusual timing)
 
-4. Network-Based Risk Scoring
+Example: Claim CLM00653351 — a $36,000 auto accident claim flagged as suspicious.
 
-The system automatically prioritizes investigations using graph metrics:
-• Network size = Total nodes in the connected subgraph
-• Fraud density = Percentage of fraudulent nodes in network
-• Total exposure = Sum of claim amounts across the network
-• Centrality scores = Key players in the fraud ring (high-degree nodes)
-• Temporal activity = Network growth rate and recency
+3. Understand Direct Relationships
 
-[📋 INSERT FLOWCHART/DIAGRAM: Optional - Visual workflow showing the 4 steps above as a process flow]
+Before exploring the full network, use the `get_claim_relationships()` stored procedure to see what makes this claim suspicious:
+
+• Shows all claims directly connected to the suspicious claim
+• Reveals the relationship type:
+  - Same Address (policyholders sharing addresses)
+  - Same Phone (policyholders sharing phone numbers)
+  - Temporal Pattern (similar claims within 30 days)
+  - Same Adjuster (claims processed by same adjuster within 90 days)
+
+This gives you immediate context: "Why is this claim suspicious? What other claims are directly related?"
+
+4. Discover the Full Fraud Network (The Recursive Magic)
+
+Now use the `discover_fraud_network()` stored procedure with recursive CTEs:
+
+• Starts from the suspicious claim (depth 0)
+• Recursively traverses the network using breadth-first search
+• Explores relationships 3-4 hops deep automatically
+• Discovers the entire connected subgraph in seconds
+• Returns all claims, policyholders, and relationships in the fraud ring
+
+This is where traditional SQL fails and recursive SQL shines — it automatically follows connections through multiple levels without writing separate queries for each hop.
+
+5. Visualize the Network Graph
+
+The discovered network is visualized as an interactive graph:
+• Claim Network Graph: Shows how fraudulent claims connect through shared policyholders
+• Multi-Entity Network Graph: Shows claims, policyholders, and adjusters in one view
+• Interactive features: Drag nodes, zoom, pan, hover for details
+• Color coding: Red = fraud, Blue = legitimate, different shapes for entity types
+
+6. Analyze Network Metrics
+
+The system calculates key metrics:
+• Total claims in network
+• Fraudulent claims count and percentage
+• Total exposure (sum of claim amounts)
+• Network depth and breadth
+• Key players (high-degree nodes)
+
+This gives fraud analysts actionable intelligence: "This is a $1.2M fraud ring with 47 members — here's the complete network."
+
+[📋 INSERT FLOWCHART/DIAGRAM: Optional - Visual workflow showing the 6 steps: Data → Identify → Direct Relationships → Recursive Discovery → Visualization → Analysis]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
