@@ -20,8 +20,7 @@ This folder contains the Medium blog post split into individual sections for eas
 - `13_call_to_action.txt` - Try It Yourself
 - `14_author_bio.txt` - Author bio
 - `15_references.txt` - References
-- `16_next_steps.txt` - Next Steps: Agentic Systems & Automation
-- `17_conclusion.txt` - Conclusion
+- `17_conclusion.txt` - Conclusion & Next Steps
 
 ## How to Use
 

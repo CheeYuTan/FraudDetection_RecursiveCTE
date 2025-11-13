@@ -1,20 +1,10 @@
-Conclusion
+Conclusion & Next Steps
 
-Graph network analysis with recursive SQL transforms fraud detection from a manual, time-consuming process into an automated, comprehensive investigation tool. By treating fraud as a network problem rather than isolated incidents, we can discover entire fraud rings in seconds instead of days.
+Graph network analysis with recursive SQL transforms fraud detection from a manual, time-consuming process into an automated, comprehensive investigation tool. By treating fraud as a network problem, we can discover entire fraud rings in seconds instead of days.
 
-The combination of:
-• Recursive CTEs for efficient network traversal
-• Interactive graph visualizations for intuitive understanding
-• Stored procedures for production-ready automation
-• Agentic system compatibility for 24/7 monitoring
+The stored procedures in this demo are production-ready and agent-compatible — they can be called by AI agents for 24/7 automated fraud detection. Imagine an agent that continuously monitors suspicious claims, automatically explores fraud networks, and escalates high-risk cases to analysts.
 
-...makes this one of the most powerful fraud detection approaches available today — and it's all built on standard SQL in your existing data warehouse.
-
-Whether you're fighting insurance fraud, financial crime, or any networked fraud pattern, recursive graph analysis gives you the tools to find the entire network, not just the individual fraudster.
-
-The demo is ready to run. The code is production-ready. The impact is measurable.
-
-It's time to stop missing 85% of fraud rings and start discovering them in seconds.
+It's time to stop missing 85% of fraud rings and start discovering them in seconds — all with standard SQL in your existing data warehouse.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
