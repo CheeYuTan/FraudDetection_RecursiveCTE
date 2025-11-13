@@ -7,9 +7,50 @@ This demo showcases how to use Databricks recursive SQL capabilities to detect i
 The demo includes:
 - **Synthetic Dataset**: Realistic insurance claim data with fraud patterns and networks
 - **Recursive SQL Queries**: Advanced queries to detect fraud rings and connected claims
-- **Network Graph Visualization**: Visual representation of fraud networks discovered through recursion
+- **Interactive Network Visualizations**: Stunning graph visualizations of fraud networks discovered through recursion
 - **Stored Procedures**: Reusable fraud detection tools for production and agentic systems
 - **Network Analysis**: Identify policyholder networks and suspicious claim chains
+
+## 🎨 Interactive Visualizations
+
+### Claim Network Graph
+Interactive network showing how fraudulent claims connect through shared policyholders:
+
+**Features:**
+- 🖱️ **Drag nodes** to rearrange the network
+- 🔍 **Scroll to zoom** in/out
+- 👆 **Hover over nodes** to see claim details
+- 🎯 **Click and drag** to pan around
+- ⚡ **Physics simulation** settles automatically
+
+**Color Legend:**
+- 🔴 **Red nodes** = Fraudulent claims
+- 🔵 **Blue nodes** = Legitimate claims
+- **Node size** = Claim amount (larger = higher value)
+- **Arrows** = Connection discovered through recursion
+
+**Network Metrics Shown:**
+- Total claims in network
+- Fraudulent claims count and percentage
+- Starting claim identification
+
+### Multi-Entity Network Graph
+Advanced visualization showing the complete fraud ecosystem with multiple entity types:
+
+**Entity Types:**
+- 🔴🔵 **Circles** = Claims (red=fraud, blue=legitimate)
+- 🟠 **Squares** = Policyholders
+- 🟢 **Triangles** = Adjusters/Service Providers
+
+**Relationship Types:**
+- **Solid gray lines** = Filed by (policyholder → claim)
+- **Dashed green lines** = Processed by (adjuster → claim)
+
+**What to Look For:**
+- Clusters of red (fraud) nodes = potential fraud rings
+- Policyholders connected to many claims = suspicious activity
+- Adjusters linked to multiple fraud claims = investigation needed
+- Dense connections = coordinated fraud patterns
 
 ## Project Structure
 
