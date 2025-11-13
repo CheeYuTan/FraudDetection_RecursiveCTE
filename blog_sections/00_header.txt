@@ -1,8 +1,0 @@
-How Graph Network Analysis Cut Insurance Fraud Investigation Time from Hours to Seconds
-
-Using Databricks Recursive SQL and Network Graph Visualization to Expose Hidden Fraud Rings
-
-Discovering connected fraud networks that traditional queries miss—and why this matters for your bottom line
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
