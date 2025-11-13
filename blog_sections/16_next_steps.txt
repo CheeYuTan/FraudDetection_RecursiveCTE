@@ -1,85 +1,14 @@
-Next Steps: Automating Fraud Detection with Agentic Systems
+Next Steps: Automating with Agentic Systems
 
-The stored procedures created in this demo aren't just for manual investigation — they're designed to be used by AI agents for automated fraud detection workflows.
+The stored procedures in this demo aren't just for manual investigation — they're designed to be called by AI agents for automated fraud detection workflows.
 
-Why Agentic Systems?
+Imagine an agent that:
+• Continuously monitors for suspicious claims
+• Automatically calls `get_claim_relationships()` and `discover_fraud_network()`
+• Analyzes network patterns and prioritizes cases
+• Escalates high-risk fraud rings to analysts
 
-Traditional fraud detection requires analysts to:
-• Manually identify suspicious claims
-• Run queries to investigate
-• Interpret results
-• Decide on next actions
-
-Agentic systems can automate this entire workflow by:
-• Continuously monitoring for suspicious claims
-• Automatically calling stored procedures to investigate
-• Analyzing network patterns
-• Prioritizing cases based on risk
-• Generating investigation reports
-• Escalating high-risk cases to human analysts
-
-How It Works with Databricks
-
-The stored procedures (`discover_fraud_network` and `get_claim_relationships`) can be called directly by AI agents:
-
-1. Agent receives alert about suspicious claim
-2. Agent calls `get_claim_relationships(claim_id)` to understand direct connections
-3. Agent calls `discover_fraud_network(claim_id, max_depth=3)` to explore full network
-4. Agent analyzes results:
-   - Network size and fraud density
-   - Total exposure amount
-   - Key players (high-degree nodes)
-5. Agent makes decision:
-   - Low risk: Log and monitor
-   - Medium risk: Flag for analyst review
-   - High risk: Immediate escalation with full network report
-
-Example Agent Workflow:
-
-```
-Agent: "I detected suspicious claim CLM00653351 ($36K). Investigating..."
-
-Agent calls: get_claim_relationships('CLM00653351')
-→ Finds 12 direct relationships
-→ Identifies "Same Address" pattern
-
-Agent calls: discover_fraud_network('CLM00653351', max_depth=3)
-→ Discovers 454 claims in network
-→ 45 fraudulent claims (9.9%)
-→ Total exposure: $1.2M
-
-Agent decision: "HIGH RISK - Fraud ring detected. 
-                 Network size: 454 claims
-                 Fraud density: 9.9%
-                 Total exposure: $1,200,000
-                 Escalating to Special Investigations Unit with full network graph."
-```
-
-Integration with Databricks AI Agents
-
-Databricks supports agentic workflows through:
-• **SQL Stored Procedures as Tools**: Your procedures can be registered as tools that agents can call
-• **Lakehouse AI**: Built-in agent framework for automated data workflows
-• **Unity Catalog Integration**: Secure access control for agent operations
-• **Delta Sharing**: Share fraud detection capabilities across organizations
-
-Benefits of Agentic Automation:
-
-⚡ **24/7 Monitoring**: Continuous fraud detection without human intervention
-📊 **Consistent Analysis**: Every suspicious claim gets the same thorough investigation
-🎯 **Prioritization**: Agents automatically rank cases by risk and exposure
-📈 **Scale**: Handle thousands of investigations simultaneously
-🔄 **Learning**: Agents can learn from analyst feedback to improve decision-making
-
-Getting Started with Agents:
-
-1. Register your stored procedures as agent tools
-2. Define agent prompts with fraud detection guidelines
-3. Set up monitoring and alerting for agent decisions
-4. Create feedback loops for continuous improvement
-5. Integrate with your existing fraud investigation workflows
-
-The stored procedures in this demo are production-ready and agent-compatible — they're designed to be called programmatically, return structured results, and integrate seamlessly with automated fraud detection systems.
+The stored procedures are production-ready and agent-compatible — they can be registered as tools in Databricks AI agents for 24/7 automated fraud detection.
 
 [🤖 INSERT DIAGRAM: Agentic Workflow - Show how agents interact with stored procedures for automated fraud detection]
 
