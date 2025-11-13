@@ -16,6 +16,8 @@ The demo includes:
 ### Claim Network Graph
 Interactive network showing how fraudulent claims connect through shared policyholders:
 
+![Claim Network Graph](images/claim_network_graph.png)
+
 **Features:**
 - 🖱️ **Drag nodes** to rearrange the network
 - 🔍 **Scroll to zoom** in/out
@@ -37,6 +39,8 @@ Interactive network showing how fraudulent claims connect through shared policyh
 ### Multi-Entity Network Graph
 Advanced visualization showing the complete fraud ecosystem with multiple entity types:
 
+![Multi-Entity Network Graph](images/multi_entity_network_graph.png)
+
 **Entity Types:**
 - 🔴🔵 **Circles** = Claims (red=fraud, blue=legitimate)
 - 🟠 **Squares** = Policyholders
@@ -57,6 +61,9 @@ Advanced visualization showing the complete fraud ecosystem with multiple entity
 ```
 .
 ├── README.md                          # This file
+├── images/                            # Screenshots and visualizations
+│   ├── claim_network_graph.png       # Claim network visualization
+│   └── multi_entity_network_graph.png # Multi-entity network visualization
 └── notebooks/                         # Databricks notebooks
     ├── 01_Dataset_Generation.py      # ⭐ Generate dataset directly in Databricks
     └── 02_Recursive_Fraud_Detection.py  # Recursive fraud detection with network visualization
