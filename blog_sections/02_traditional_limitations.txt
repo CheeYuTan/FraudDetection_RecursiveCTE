@@ -1,5 +1,7 @@
 Why Traditional Fraud Detection Falls Short
 
+Traditional fraud detection systems are actually quite good at identifying individual suspicious claims — flagging a suspiciously high medical bill here, an accident reported too soon after policy activation there, or claims from known high-risk areas. They excel at spotting isolated red flags.
+
 Let's say your fraud analyst flags claim CLM00653351 — a $36,000 auto accident claim that looks suspicious. Great start. But here's what happens next with traditional approaches:
 
 Manual Investigation (The Old Way):
@@ -14,14 +16,25 @@ Result: You find 6-10 connected claims. The fraud ring has 47 members with $1.2M
 
 [🎯 INSERT GIF/ANIMATION: Manual investigation process - Could show analyst clicking through multiple screens/tables, looking frustrated]
 
-Traditional SQL Queries (Still Limited):
+Traditional SQL Queries (Slow for Recursive Traversal):
 
--- This only finds claims from the SAME policyholder
+Traditional SQL is excellent for finding individual suspicious claims, but it's painfully slow when you need to traverse networks recursively:
+
+-- This only finds claims from the SAME policyholder (1 level deep)
 SELECT * FROM claims WHERE policyholder_id = 'PH12345';
 
-This misses the fraud ring entirely because they're smart enough to use multiple fake identities.
+-- To go 2 levels deep, you need another query:
+SELECT c2.* FROM claims c1
+JOIN policyholders p1 ON c1.policyholder_id = p1.policyholder_id
+JOIN policyholders p2 ON p1.address = p2.address
+JOIN claims c2 ON c2.policyholder_id = p2.policyholder_id
+WHERE c1.claim_id = 'CLM00653351';
 
-The Core Problem: Fraud networks require exploring relationships 2, 3, or 4 degrees away from the starting point. Traditional SQL can't traverse networks. You'd need to write separate queries for each "hop" — and fraud rings can be 5+ levels deep.
+-- For 3 levels? Another query. 4 levels? Another query. And each query gets exponentially slower.
+
+This misses the fraud ring entirely because they're smart enough to use multiple fake identities. More importantly, traditional SQL can't efficiently traverse networks recursively — you'd need to write separate queries for each "hop," and fraud rings can be 5+ levels deep. Each additional level requires a new query, and performance degrades exponentially.
+
+The Core Problem: Fraud networks require exploring relationships 2, 3, or 4 degrees away from the starting point. Traditional SQL is good at identifying individual suspicious claims, but it's fundamentally slow and inefficient for recursive network traversal. You'd need to write separate queries for each "hop" — and fraud rings can be 5+ levels deep, making the approach impractical.
 
 [📉 INSERT DIAGRAM: Traditional SQL Limitation - Simple diagram showing how traditional queries only see 1 level deep]
 
