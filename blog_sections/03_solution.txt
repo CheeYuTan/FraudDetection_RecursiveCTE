@@ -1,0 +1,56 @@
+Enter Graph Network Analysis: The Game Changer
+
+The insight: Fraud isn't isolated incidents — it's a network problem. Fraudsters, fake identities, claims, service providers, and adjusters form a connected graph. To catch them, you need graph network analysis.
+
+Databricks Runtime 17.0 introduced support for Recursive Common Table Expressions (CTEs) — a SQL feature that enables true graph traversal directly in your data warehouse, no separate graph database needed.
+
+Here's the magic: Recursive SQL treats your data as a graph and automatically traverses the entire fraud network in a single query execution.
+
+From Tables to Networks
+
+Traditional SQL thinks in tables and rows:
+• Claims table
+• Policyholders table
+• Join them, filter them, aggregate them
+
+Graph network analysis thinks in nodes and edges:
+• Nodes = Claims, Policyholders, Adjusters, Service Providers
+• Edges = Relationships (filed by, processed by, shares address, same timing)
+• Network traversal = Follow connections to discover fraud rings
+
+[🔄 INSERT DIAGRAM/ANIMATION: Graph Network Concept - Simple visualization showing nodes and edges, maybe animated to show traversal]
+
+Graph Traversal with Recursive SQL
+
+Think of it as a breadth-first search through the fraud network graph:
+
+WITH RECURSIVE fraud_network AS (
+  -- Start from one suspicious claim
+  SELECT claim_id, policyholder_id, 0 as depth
+  FROM claims WHERE claim_id = 'CLM00653351'
+  
+  UNION ALL
+  
+  -- Find all connected claims (automatically repeats)
+  SELECT c2.claim_id, c2.policyholder_id, depth + 1
+  FROM fraud_network fn
+  JOIN policyholders p1 ON fn.policyholder_id = p1.policyholder_id
+  JOIN policyholders p2 ON p1.address = p2.address OR p1.phone = p2.phone
+  JOIN claims c2 ON c2.policyholder_id = p2.policyholder_id
+  WHERE depth < 3
+)
+SELECT * FROM fraud_network;
+
+What this does (graph traversal perspective):
+• Starts at 1 node (suspicious claim) in the fraud network graph
+• Explores edges to find connected nodes (policyholders with shared attributes)
+• Traverses to next level of nodes (their claims)
+• Repeats recursively until entire connected subgraph is discovered
+• Maps the complete fraud ring network in seconds
+
+This is true graph network analysis — but done entirely in SQL on your existing data warehouse, no specialized graph database required.
+
+[💻 INSERT CODE SCREENSHOT: Optional - Syntax-highlighted version of the recursive SQL above for visual appeal]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

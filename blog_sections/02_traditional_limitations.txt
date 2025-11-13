@@ -1,0 +1,29 @@
+Why Traditional Fraud Detection Falls Short
+
+Let's say your fraud analyst flags claim CLM00653351 — a $36,000 auto accident claim that looks suspicious. Great start. But here's what happens next with traditional approaches:
+
+Manual Investigation (The Old Way):
+
+1. Check the policyholder's other claims → Find 2 related claims
+2. Manually look up those policyholders → Find 1 with same address
+3. Check their claims → Find 3 more suspicious claims
+4. Repeat the process... for hours or days
+5. Eventually give up because it's too time-consuming
+
+Result: You find 6-10 connected claims. The fraud ring has 47 members with $1.2M in fraudulent claims. You missed 85% of it.
+
+[🎯 INSERT GIF/ANIMATION: Manual investigation process - Could show analyst clicking through multiple screens/tables, looking frustrated]
+
+Traditional SQL Queries (Still Limited):
+
+-- This only finds claims from the SAME policyholder
+SELECT * FROM claims WHERE policyholder_id = 'PH12345';
+
+This misses the fraud ring entirely because they're smart enough to use multiple fake identities.
+
+The Core Problem: Fraud networks require exploring relationships 2, 3, or 4 degrees away from the starting point. Traditional SQL can't traverse networks. You'd need to write separate queries for each "hop" — and fraud rings can be 5+ levels deep.
+
+[📉 INSERT DIAGRAM: Traditional SQL Limitation - Simple diagram showing how traditional queries only see 1 level deep]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

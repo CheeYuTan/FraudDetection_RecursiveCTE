@@ -1,0 +1,6 @@
+[👤 INSERT AUTHOR PHOTO: Optional - Professional headshot]
+
+Steven Tan is a data engineering professional specializing in fraud detection, graph network analysis, and production data systems. This demo showcases how to perform enterprise-scale graph network analysis using Databricks recursive SQL — bringing graph analytics capabilities to your data warehouse without separate graph databases.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

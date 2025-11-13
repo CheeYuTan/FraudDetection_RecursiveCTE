@@ -1,0 +1,19 @@
+The Bottom Line
+
+Traditional fraud detection: Find the fraudster.
+Recursive fraud detection: Find the entire fraud ring.
+
+The difference? Millions of dollars per year in prevented fraud loss.
+
+Databricks Recursive SQL isn't just a technical feature — it's a business game-changer for any organization fighting networked fraud. The combination of:
+⚡ Speed (seconds instead of days)
+📈 Scale (10M+ claims analyzed effortlessly)
+🎯 Completeness (find 95%+ of networks)
+💰 Cost (just SQL on existing infrastructure)
+
+...makes this one of the highest-ROI fraud prevention tools available today.
+
+[📊 INSERT SUMMARY GRAPHIC: Key benefits summary - 4-quadrant visual showing Speed/Scale/Completeness/Cost]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

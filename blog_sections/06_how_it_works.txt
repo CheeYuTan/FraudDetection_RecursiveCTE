@@ -1,0 +1,42 @@
+How It Works (The Business View)
+
+1. Network Graph Construction
+
+The system continuously builds a graph from your transactional data:
+• Nodes = Claims, Policyholders, Adjusters, Service Providers
+• Edges = Relationships detected from shared attributes:
+  - Policyholders sharing addresses or phone numbers (identity network)
+  - Claims handled by the same service providers (service network)
+  - Temporal patterns (timeline network)
+
+2. Graph Traversal & Network Discovery
+
+When a suspicious claim is flagged (by your existing fraud detection rules):
+• Recursive SQL performs breadth-first graph traversal from the flagged node
+• Automatically explores all edges and connected nodes
+• Discovers the full fraud subgraph in seconds
+• Maps network relationships 3-4 hops deep
+• Identifies all involved entities (parties, service providers)
+
+3. Interactive Network Graph Visualization
+
+Fraud analysts see the complete fraud network as an interactive graph:
+• Visual network topology (drag nodes, zoom, pan around the graph)
+• Color-coded nodes (fraud vs. legitimate, different entity types)
+• Network metrics (centrality, clustering, total exposure)
+• Path visualization (how entities connect through the network)
+• Actionable intelligence for law enforcement with visual proof
+
+4. Network-Based Risk Scoring
+
+The system automatically prioritizes investigations using graph metrics:
+• Network size = Total nodes in the connected subgraph
+• Fraud density = Percentage of fraudulent nodes in network
+• Total exposure = Sum of claim amounts across the network
+• Centrality scores = Key players in the fraud ring (high-degree nodes)
+• Temporal activity = Network growth rate and recency
+
+[📋 INSERT FLOWCHART/DIAGRAM: Optional - Visual workflow showing the 4 steps above as a process flow]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

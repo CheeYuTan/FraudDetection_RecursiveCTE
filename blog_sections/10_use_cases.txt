@@ -1,0 +1,30 @@
+Real-World Use Cases Beyond Insurance
+
+While this demo focuses on insurance fraud, the same recursive network analysis applies to:
+
+Financial Services:
+• Money laundering network detection
+• Account takeover rings
+• Credit card fraud networks
+
+Healthcare:
+• Medicare/Medicaid fraud rings
+• Provider network abuse
+• Prescription drug fraud schemes
+
+Retail & E-commerce:
+• Return fraud networks
+• Promo abuse rings
+• Fake review networks
+
+Telecommunications:
+• SIM card fraud rings
+• Account sharing networks
+• Service abuse patterns
+
+Any industry where fraud is networked and connected.
+
+[🏢 INSERT ICONS/GRAPHICS: Industry icons showing the various use cases - Banking, Healthcare, Retail, Telecom symbols]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
