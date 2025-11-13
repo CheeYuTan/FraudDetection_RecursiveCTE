@@ -8,11 +8,7 @@
 
 ## The Global Fraud Crisis
 
-Insurance fraud is a massive global problem costing the industry over **$80 billion annually worldwide**[^1], with regional impacts reaching staggering levels:
-
-- **United States:** $308.6 billion/year (~$933 per person)[^2]
-- **Europe:** €13 billion/year (~10% of all payouts)[^3]
-- **Asia-Pacific:** 22% year-over-year increase in 2023[^1]
+Insurance fraud is a massive global problem affecting every region. In the **United States alone**, insurance fraud costs approximately **$308.6 billion annually** — that's **$933 per person per year**, according to a 2022 study by the Coalition Against Insurance Fraud[^1]. And this is just one country; the problem extends globally with billions more in losses across Europe, Asia-Pacific, and other regions.
 
 But here's what keeps fraud investigators up at night across all regions: **they know they're only catching the obvious cases**.
 
@@ -377,7 +373,5 @@ The complete demo with all code, data generation, and interactive visualizations
 
 ## References
 
-[^1]: Best Insurance Hub (2025). "Global Insurance Fraud Statistics and Trends." Available at: https://www.bestinsurancehub.com/
-[^2]: Coalition Against Insurance Fraud (2022). "The Impact of Insurance Fraud on the U.S. Economy." Available at: https://www.insurancefraud.org/
-[^3]: CoinLaw Insurance Research (2024). "International Insurance Fraud Statistics." Available at: https://coinlaw.io/insurance-fraud-statistics/
+[^1]: Coalition Against Insurance Fraud (2022). "The Impact of Insurance Fraud on the U.S. Economy." Available at: https://www.insurancefraud.org/
 
