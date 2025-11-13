@@ -16,7 +16,7 @@ The demo includes:
 ### Claim Network Graph
 Interactive network showing how fraudulent claims connect through shared policyholders:
 
-![Claim Network Graph](images/claim_network_graph.png)
+![Claim Network Graph](images/claim_network_graph.png?v=2)
 
 **Features:**
 - 🖱️ **Drag nodes** to rearrange the network
@@ -39,7 +39,7 @@ Interactive network showing how fraudulent claims connect through shared policyh
 ### Multi-Entity Network Graph
 Advanced visualization showing the complete fraud ecosystem with multiple entity types:
 
-![Multi-Entity Network Graph](images/multi_entity_network_graph.png)
+![Multi-Entity Network Graph](images/multi_entity_network_graph.png?v=2)
 
 **Entity Types:**
 - 🔴🔵 **Circles** = Claims (red=fraud, blue=legitimate)
